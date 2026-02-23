@@ -1,0 +1,14 @@
+# Env and secrets (do not commit .env)
+.env
+pipeline/.env
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.env/
+
+# IDE
+.idea/
+.cursor/
