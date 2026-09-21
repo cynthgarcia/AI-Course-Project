@@ -84,7 +84,7 @@ const PLAN = {
     {
       id: 'audit-1',
       label: 'Life Audit 01',
-      defaultDate: '',
+      defaultDate: '2026-10-28',
       milestones: [
         { id: 'a1-health', category: 'Health', text: "Stuck to one Deliveroo a week, with each other's orders audited as proof, and 12 workout classes completed." },
         { id: 'a1-wealth', category: 'Wealth', text: 'A monthly fun budget set and stuck to.' },
@@ -94,8 +94,8 @@ const PLAN = {
         { id: 'a1-creative', category: 'Creative', text: 'Posted on the personal brand TikTok, created the Cynthia Tech Talks account, and established the CTT TikTok strategy.' },
       ],
     },
-    { id: 'audit-2', label: 'Life Audit 02', defaultDate: '', milestones: [] },
-    { id: 'audit-3', label: 'Life Audit 03', defaultDate: '', milestones: [] },
+    { id: 'audit-2', label: 'Life Audit 02', defaultDate: '2026-11-25', milestones: [] },
+    { id: 'audit-3', label: 'Life Audit 03', defaultDate: '2026-12-28', milestones: [] },
   ],
 };
 
@@ -254,7 +254,7 @@ function renderDashboard() {
 
   // Next audit
   const upcoming = PLAN.lifeAudits
-    .map((a) => ({ audit: a, date: state.auditDates[a.id] }))
+    .map((a) => ({ audit: a, date: state.auditDates[a.id] || a.defaultDate }))
     .filter((x) => x.date)
     .map((x) => ({ ...x, diff: daysUntil(x.date) }))
     .sort((a, b) => a.diff - b.diff);
