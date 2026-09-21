@@ -1,0 +1,16 @@
+{
+  "name": "Becca's Glow Up Plan",
+  "short_name": "Glow Up Plan",
+  "description": "Twelve-month plan progress tracker: pillars, evidence, life audits, and gratitude journal.",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#f7f4fb",
+  "theme_color": "#8b6bc9",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
