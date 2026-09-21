@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cynthia's Glow Up Plan — Progress Tracker</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div id="app">
+
+  <header class="app-header">
+    <div class="header-inner">
+      <div class="brand">
+        <span class="brand-ribbon">🎀</span>
+        <div>
+          <h1>Cynthia's Glow Up Plan</h1>
+          <p class="tagline">The Twelve-Month Plan — consistency is sexy, excuses aren't.</p>
+        </div>
+      </div>
+      <div class="header-actions">
+        <button id="btn-export" class="btn btn-ghost" title="Download your data as a backup file">Export</button>
+        <label class="btn btn-ghost" title="Restore from a backup file">
+          Import
+          <input type="file" id="file-import" accept="application/json" hidden>
+        </label>
+        <button id="btn-reset" class="btn btn-ghost btn-danger" title="Clear all your progress">Reset</button>
+      </div>
+    </div>
+    <nav class="tabs" id="tabs">
+      <button class="tab-btn active" data-tab="dashboard">Dashboard</button>
+      <button class="tab-btn" data-tab="pillars">The 6 Pillars</button>
+      <button class="tab-btn" data-tab="audits">Life Audits</button>
+      <button class="tab-btn" data-tab="journal">Gratitude Journal</button>
+    </nav>
+  </header>
+
+  <main class="app-main">
+
+    <section id="tab-dashboard" class="tab-panel active">
+      <div class="dashboard-top">
+        <div class="card overall-card">
+          <div class="ring-wrap">
+            <svg viewBox="0 0 120 120" class="ring">
+              <circle cx="60" cy="60" r="52" class="ring-track"/>
+              <circle cx="60" cy="60" r="52" class="ring-progress" id="overall-ring"/>
+            </svg>
+            <div class="ring-label">
+              <span id="overall-percent">0%</span>
+              <small>overall</small>
+            </div>
+          </div>
+          <div class="overall-meta">
+            <h2>Your progress so far</h2>
+            <p id="overall-summary">0 of 0 actions done.</p>
+          </div>
+        </div>
+        <div class="card next-audit-card" id="next-audit-card">
+          <h3>Next Life Audit</h3>
+          <div id="next-audit-body">Set your audit dates on the Life Audits tab.</div>
+        </div>
+        <div class="card latest-journal-card" id="latest-journal-card">
+          <h3>Latest gratitude entry</h3>
+          <div id="latest-journal-body">No entries yet — start your first one on the Gratitude Journal tab.</div>
+        </div>
+      </div>
+
+      <h3 class="section-heading">Pillar progress</h3>
+      <div class="pillar-progress-grid" id="pillar-progress-grid"></div>
+    </section>
+
+    <section id="tab-pillars" class="tab-panel">
+      <div class="pillar-nav" id="pillar-nav"></div>
+      <div id="pillar-detail"></div>
+    </section>
+
+    <section id="tab-audits" class="tab-panel">
+      <p class="hint">Three checkpoints to be honest with yourself. Set the date, tick what's true, and add anything else you want to hold yourself to.</p>
+      <div id="audits-list" class="audits-list"></div>
+    </section>
+
+    <section id="tab-journal" class="tab-panel">
+      <p class="hint">Once a week, write down what you did and how you genuinely feel about it — not how you think you should feel.</p>
+      <form id="journal-form" class="journal-form card">
+        <div class="form-row">
+          <label>Week of
+            <input type="date" id="journal-date" required>
+          </label>
+          <label>Mood
+            <div class="mood-picker" id="mood-picker">
+              <button type="button" class="mood-btn" data-mood="rough">😞</button>
+              <button type="button" class="mood-btn" data-mood="meh">😐</button>
+              <button type="button" class="mood-btn" data-mood="okay">🙂</button>
+              <button type="button" class="mood-btn" data-mood="good">😊</button>
+              <button type="button" class="mood-btn" data-mood="glowing">🤩</button>
+            </div>
+          </label>
+        </div>
+        <label class="block-label">Things I did this week that I'm proud of
+          <textarea id="journal-wins" rows="3" placeholder="Meal prepped Sunday, made it to two gym sessions, finally booked therapy..."></textarea>
+        </label>
+        <label class="block-label">How I genuinely feel
+          <textarea id="journal-feelings" rows="3" placeholder="No performing here — how did this week actually feel?"></textarea>
+        </label>
+        <label class="block-label">What I'm grateful for
+          <textarea id="journal-gratitude" rows="2" placeholder="One or a few things, big or small..."></textarea>
+        </label>
+        <div class="form-actions">
+          <button type="submit" class="btn btn-primary" id="journal-submit">Save entry</button>
+          <button type="button" class="btn btn-ghost" id="journal-cancel-edit" hidden>Cancel edit</button>
+        </div>
+      </form>
+      <div id="journal-list" class="journal-list"></div>
+    </section>
+
+  </main>
+
+  <footer class="app-footer">
+    <p>Everything here is saved privately in this browser. Use <strong>Export</strong> regularly to back up your progress.</p>
+  </footer>
+
+</div>
+<script src="app.js"></script>
+</body>
+</html>
