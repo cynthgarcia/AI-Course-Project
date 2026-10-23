@@ -68,7 +68,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         )}
       </main>
 
-      <nav aria-label="Main" className="fixed inset-x-0 bottom-0 z-40 border-t border-line bg-card/95 backdrop-blur sm:hidden">
+      <nav aria-label="Main" className="fixed inset-x-0 bottom-0 z-40 border-t border-line bg-card/95 pb-[env(safe-area-inset-bottom,0px)] backdrop-blur sm:hidden">
         <ul className="mx-auto flex max-w-md justify-around">
           {NAV.map((n) => (
             <li key={n.href} className="flex-1">
