@@ -17,5 +17,11 @@ export default defineConfig({
   ],
   webServer: process.env.E2E_EXTERNAL_SERVER
     ? undefined
-    : { command: `npx next start -p ${port}`, port, reuseExistingServer: true, timeout: 60_000 },
+    : {
+        command: `npx next start -p ${port}`,
+        port,
+        reuseExistingServer: true,
+        timeout: 60_000,
+        env: { DATA_DIR: "memory://", SIGNUP_RATE_LIMIT: "1000", NEXT_TELEMETRY_DISABLED: "1" },
+      },
 });

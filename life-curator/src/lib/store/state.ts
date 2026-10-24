@@ -1,11 +1,12 @@
-// Application state and its reducer. Pure, so it can be unit-tested and later
-// swapped for server persistence (Supabase) without touching the UI contract.
+// Application state and its reducer. Pure: the browser runs it for instant feedback and
+// the server runs the same reducer to validate and persist every action.
 import { DEFAULT_PREFERENCES } from "@/lib/data/defaults";
 import { canTransition, canTransitionTrip } from "@/lib/domain/status";
 import type {
   Category,
   CostItem,
   DismissalReason,
+  Experience,
   FeedbackEntry,
   LocalStatus,
   Preferences,
@@ -33,6 +34,7 @@ export interface AppState {
   feedback: FeedbackEntry[];
   plans: WeeklyPlan[];
   runs: PlanRun[];
+  experiences: Record<string, Experience>;
 }
 
 export const INITIAL_STATE: AppState = {
@@ -45,27 +47,60 @@ export const INITIAL_STATE: AppState = {
   feedback: [],
   plans: [],
   runs: [],
+  experiences: {},
 };
+
+export type ExperiencePatch = Partial<
+  Pick<Experience, "title" | "category" | "tags" | "venueName" | "neighborhood" | "city" | "date" | "rating" | "cost" | "withWhom" | "wasNew" | "notes">
+>;
 
 export type Action =
   | { type: "hydrate"; state: AppState }
   | { type: "completeOnboarding" }
   | { type: "setPrefs"; prefs: Partial<Preferences> }
   | { type: "setCalendarMode"; mode: AppState["calendarMode"] }
-  | { type: "setStatus"; eventId: string; category: Category; status: LocalStatus; plannedCost?: CostItem | null; budgetOverride?: boolean; at: string }
+  | {
+      type: "setStatus";
+      eventId: string;
+      category: Category;
+      status: LocalStatus;
+      plannedCost?: CostItem | null;
+      budgetOverride?: boolean;
+      /** Supplied when confirming attendance, so it lands in the user's history. */
+      experience?: Experience;
+      at: string;
+    }
   | { type: "dismiss"; eventId: string; category: Category; reason: DismissalReason | null; at: string }
   | { type: "removeSaved"; eventId: string }
   | { type: "recordActualCost"; eventId: string; cost: CostItem | null; at: string }
   | { type: "setNotes"; eventId: string; notes: string; at: string }
   | { type: "setReflection"; eventId: string; category: Category; reflection: Reflection; at: string }
-  | { type: "setTripStatus"; eventId: string; category: Category; status: TravelStatus; initialCosts: TripCosts; budgetOverride?: boolean; at: string }
+  | { type: "setTripStatus"; eventId: string; category: Category; status: TravelStatus; initialCosts: TripCosts; budgetOverride?: boolean; experience?: Experience; at: string }
   | { type: "setTripCosts"; eventId: string; costs: TripCosts; at: string }
   | { type: "setTripActualCosts"; eventId: string; costs: TripCosts | null; at: string }
   | { type: "setTripNotes"; eventId: string; notes: string; at: string }
   | { type: "removeTrip"; eventId: string }
   | { type: "addPlan"; plan: WeeklyPlan; run: PlanRun }
   | { type: "recordFailedRun"; run: PlanRun }
+  | { type: "addExperience"; experience: Experience }
+  | { type: "updateExperience"; id: string; patch: ExperiencePatch; at: string }
+  | { type: "deleteExperience"; id: string }
   | { type: "reset" };
+
+function linkedExperience(state: AppState, eventId: string): Experience | undefined {
+  return Object.values(state.experiences).find((x) => x.eventId === eventId);
+}
+
+/** Adds the attended experience once; reverting attendance removes the app-created record. */
+function syncAttendance(state: AppState, eventId: string, attended: boolean, experience: Experience | undefined): Record<string, Experience> {
+  const existing = linkedExperience(state, eventId);
+  if (attended && !existing && experience) return { ...state.experiences, [experience.id]: { ...experience, eventId, source: "app" } };
+  if (!attended && existing?.source === "app") {
+    const { [existing.id]: _removed, ...rest } = state.experiences;
+    return rest;
+  }
+  return state.experiences;
+}
 
 function blankSaved(eventId: string, status: LocalStatus, at: string): SavedEvent {
   return {
@@ -108,7 +143,8 @@ export function reducer(state: AppState, action: Action): AppState {
         action.status === "saved" || action.status === "interested"
           ? [...state.feedback, { eventId: action.eventId, category: action.category, kind: "save" as const, reason: null, at: action.at }]
           : state.feedback;
-      return { ...state, saved: { ...state.saved, [action.eventId]: next }, feedback };
+      const experiences = syncAttendance(state, action.eventId, action.status === "attended", action.experience);
+      return { ...state, saved: { ...state.saved, [action.eventId]: next }, feedback, experiences };
     }
     case "dismiss": {
       const current = state.saved[action.eventId];
@@ -131,7 +167,9 @@ export function reducer(state: AppState, action: Action): AppState {
     case "recordActualCost": {
       const current = state.saved[action.eventId];
       if (!current) return state;
-      return { ...state, saved: { ...state.saved, [action.eventId]: { ...current, actualCost: action.cost, updatedAt: action.at } } };
+      const linked = linkedExperience(state, action.eventId);
+      const experiences = linked ? { ...state.experiences, [linked.id]: { ...linked, cost: action.cost, updatedAt: action.at } } : state.experiences;
+      return { ...state, experiences, saved: { ...state.saved, [action.eventId]: { ...current, actualCost: action.cost, updatedAt: action.at } } };
     }
     case "setNotes": {
       const current = state.saved[action.eventId];
@@ -146,7 +184,19 @@ export function reducer(state: AppState, action: Action): AppState {
       const feedback = kind
         ? [...state.feedback.filter((f) => !(f.eventId === action.eventId && f.kind.startsWith("attended"))), { eventId: action.eventId, category: action.category, kind, reason: null, at: action.at }]
         : state.feedback;
-      return { ...state, feedback, saved: { ...state.saved, [action.eventId]: { ...current, reflection: action.reflection, updatedAt: action.at } } };
+      const linked = linkedExperience(state, action.eventId);
+      const experiences = linked
+        ? {
+            ...state.experiences,
+            [linked.id]: {
+              ...linked,
+              rating: normalizeRating(action.reflection.rating ?? linked.rating),
+              wasNew: action.reflection.wasNew ?? linked.wasNew,
+              updatedAt: action.at,
+            },
+          }
+        : state.experiences;
+      return { ...state, feedback, experiences, saved: { ...state.saved, [action.eventId]: { ...current, reflection: action.reflection, updatedAt: action.at } } };
     }
     case "setTripStatus": {
       const current = state.trips[action.eventId];
@@ -159,7 +209,8 @@ export function reducer(state: AppState, action: Action): AppState {
         action.status === "not_for_me"
           ? [...state.feedback, { eventId: action.eventId, category: action.category, kind: "dismiss" as const, reason: null, at: action.at }]
           : state.feedback;
-      return { ...state, feedback, trips: { ...state.trips, [action.eventId]: next } };
+      const experiences = syncAttendance(state, action.eventId, action.status === "attended", action.experience);
+      return { ...state, feedback, experiences, trips: { ...state.trips, [action.eventId]: next } };
     }
     case "setTripCosts": {
       const current = state.trips[action.eventId];
@@ -184,9 +235,30 @@ export function reducer(state: AppState, action: Action): AppState {
       return { ...state, plans: upsertPlan(state.plans, action.plan), runs: [action.run, ...state.runs].slice(0, 30) };
     case "recordFailedRun":
       return { ...state, runs: [action.run, ...state.runs].slice(0, 30) };
+    case "addExperience": {
+      const x = action.experience;
+      if (state.experiences[x.id]) return state;
+      return { ...state, experiences: { ...state.experiences, [x.id]: { ...x, rating: normalizeRating(x.rating) } } };
+    }
+    case "updateExperience": {
+      const current = state.experiences[action.id];
+      if (!current) return state;
+      const patch = { ...action.patch };
+      if ("rating" in patch) patch.rating = normalizeRating(patch.rating ?? null);
+      return { ...state, experiences: { ...state.experiences, [action.id]: { ...current, ...patch, updatedAt: action.at } } };
+    }
+    case "deleteExperience": {
+      const { [action.id]: _removed, ...rest } = state.experiences;
+      return { ...state, experiences: rest };
+    }
     case "reset":
       return INITIAL_STATE;
   }
+}
+
+/** Ratings are whole stars from 1 to 5; anything else means "not rated". */
+export function normalizeRating(r: number | null | undefined): number | null {
+  return typeof r === "number" && Number.isInteger(r) && r >= 1 && r <= 5 ? r : null;
 }
 
 /** Validates and migrates persisted state; anything unexpected falls back to defaults. */

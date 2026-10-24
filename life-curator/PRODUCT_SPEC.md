@@ -21,6 +21,8 @@ under user control: **no bookings, purchases, calendar writes or messages in the
 | Hard exclusions applied before scoring; ≤6 shortlist; diversity | `src/lib/domain/ranking.ts` |
 | Deduplication keeps separate performances | `src/lib/domain/dedupe.ts` |
 | One plan per week, run history, safe retry | `src/lib/domain/weeklyPlan.ts` |
+| Taste profile from 1–5★ ratings (shrunk toward neutral, samples excluded) | `src/lib/domain/taste.ts` |
+| Wrapped yearly summary (no invented costs) | `src/lib/domain/wrapped.ts` |
 
 ## Data honesty
 - Sample events are fictional, badged "Sample" everywhere, and carry no official/booking links,
@@ -31,15 +33,15 @@ under user control: **no bookings, purchases, calendar writes or messages in the
 - Unknown price → "Price not verified", never "Free".
 
 ## Screens
-This Week (`/`), Discover (`/discover`, with Europe tab), My Life (`/my-life`), Event details
-(`/events/[id]`), Settings (`/settings`), plus first-run onboarding.
+This Week (`/`), Discover (`/discover`, with Europe tab), My Life (`/my-life`), Wrapped
+(`/wrapped`), Event details (`/events/[id]`), Settings (`/settings`), sign-in/up, and first-run onboarding.
 
 ## Roadmap status
 | Phase | Status |
 |---|---|
 | 0 Inspect & prepare | Done |
 | 1 Functional core app (demo data, local persistence) | Done |
-| 2 Persistence & auth (Supabase, RLS) | Schema drafted in `supabase/migrations/` — not applied |
+| 2 Persistence & auth | Done: Postgres (PGlite locally / DATABASE_URL in prod), email+password accounts, per-user scoping |
 | 3 Google Calendar read-only free/busy | Not started — needs OAuth credentials |
 | 4 Real event sources | Adapter interface ready (`src/lib/sources/types.ts`); no real adapters |
 | 5 Recommendation engine | Deterministic engine done; AI explanations optional/not used |

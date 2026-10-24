@@ -9,12 +9,12 @@ import { Badge, EmptyState, Notice, SectionHeading, btn } from "@/components/ui"
 import { selectShortlist, weeklyCapacity } from "@/lib/domain/ranking";
 import { DAY, formatShortDay, formatTime, localDate, startOfWeek } from "@/lib/domain/time";
 import { LOCAL_STATUS_LABELS } from "@/lib/domain/types";
-import { countFreeEvenings, generateWeeklyPlan } from "@/lib/domain/weeklyPlan";
+import { countFreeEvenings } from "@/lib/domain/weeklyPlan";
 import { useStore } from "@/lib/store/AppStore";
 import { whenLabel } from "@/lib/ui/format";
 
 export default function ThisWeekPage() {
-  const { state, dispatch, derived } = useStore();
+  const { state, derived, generatePlan } = useStore();
   const [message, setMessage] = useState<string | null>(null);
   const { prefs } = state;
   const tz = prefs.timezone;
@@ -47,16 +47,14 @@ export default function ThisWeekPage() {
 
   if (!derived || !view) return null;
 
-  const generate = () => {
-    const at = new Date().toISOString();
-    try {
-      const plan = generateWeeklyPlan(derived.events, derived.rankContext);
-      dispatch({ type: "addPlan", plan, run: { at, weekStart: plan.weekStart, trigger: "manual", outcome: "generated", itemCount: plan.items.length, error: null } });
-      setMessage(`Plan generated with ${plan.items.length} suggestion${plan.items.length === 1 ? "" : "s"}. It's saved here only — nothing was sent.`);
-    } catch {
-      dispatch({ type: "recordFailedRun", run: { at, weekStart: startOfWeek(localDate(derived.now, tz)), trigger: "manual", outcome: "failed", itemCount: 0, error: "Plan generation failed." } });
-      setMessage("Plan generation failed. Your previous plan is unchanged — you can safely try again.");
-    }
+  const generate = async () => {
+    setMessage(null);
+    const res = await generatePlan();
+    setMessage(
+      res.ok
+        ? `Plan generated with ${res.count} suggestion${res.count === 1 ? "" : "s"}. Saved — nothing was sent anywhere.`
+        : "Plan generation failed. Your previous plan is unchanged — you can safely try again.",
+    );
   };
 
   const planItems = view.plan?.items

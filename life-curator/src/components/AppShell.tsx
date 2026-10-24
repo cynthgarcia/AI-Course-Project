@@ -11,6 +11,7 @@ const NAV = [
   { href: "/", label: "This Week", icon: "☀︎" },
   { href: "/discover", label: "Discover", icon: "✦" },
   { href: "/my-life", label: "My Life", icon: "❖" },
+  { href: "/wrapped", label: "Wrapped", icon: "★" },
   { href: "/settings", label: "Settings", icon: "⚙︎" },
 ];
 
@@ -20,7 +21,7 @@ function isActive(path: string, href: string) {
 
 export function AppShell({ children }: { children: ReactNode }) {
   const path = usePathname();
-  const { ready, state, loadError, storageAvailable, snapshot } = useStore();
+  const { ready, state, loadError, storageAvailable, snapshot, mode, syncError } = useStore();
 
   return (
     <div className="mx-auto flex min-h-dvh max-w-5xl flex-col">
@@ -50,10 +51,17 @@ export function AppShell({ children }: { children: ReactNode }) {
 
       <div className="px-4 sm:px-6">
         <p className="rounded-md border border-line bg-warn-soft px-3 py-2 text-xs text-warn" role="note">
-          <strong>Demo mode.</strong> All events are fictional samples, and {calendarLabel(state.calendarMode, snapshot)}. Nothing here is real or bookable yet.
-          {!storageAvailable && " Your browser storage is unavailable, so changes won't be kept after you leave."}
+          <strong>Sample events.</strong> All events are fictional samples, and {calendarLabel(state.calendarMode, snapshot)}. Nothing here is real or bookable yet.
+          {mode === "local" && " This preview keeps your changes in this browser only."}
+          {mode === "local" && !storageAvailable && " Your browser storage is unavailable, so changes won't be kept after you leave."}
         </p>
       </div>
+
+      {syncError && (
+        <div className="px-4 pt-2 sm:px-6" role="alert">
+          <p className="rounded-md bg-bad-soft px-3 py-2 text-xs text-bad">{syncError} Your last change was undone — please try again.</p>
+        </div>
+      )}
 
       <main id="main" className="flex-1 px-4 pb-28 pt-4 sm:px-6 sm:pb-12">
         {loadError ? (

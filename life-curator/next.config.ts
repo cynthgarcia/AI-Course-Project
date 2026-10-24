@@ -9,6 +9,8 @@ const securityHeaders = [
 
 const nextConfig: NextConfig = {
   poweredByHeader: false,
+  // PGlite loads its WebAssembly Postgres from its own package files at runtime.
+  serverExternalPackages: ["@electric-sql/pglite"],
   async headers() {
     return [{ source: "/(.*)", headers: securityHeaders }];
   },

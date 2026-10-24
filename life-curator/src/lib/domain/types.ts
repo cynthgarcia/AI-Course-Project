@@ -266,6 +266,8 @@ export interface CostItem {
 }
 
 export interface Reflection {
+  /** 1–5 stars. Feeds the taste profile used in ranking. */
+  rating?: number | null;
   enjoyed: boolean | null;
   wouldRepeat: boolean | null;
   wasNew: boolean | null;
@@ -311,4 +313,34 @@ export interface FeedbackEntry {
   kind: "dismiss" | "save" | "attended_enjoyed" | "attended_disliked";
   reason: DismissalReason | null;
   at: string;
+}
+
+export type WithWhom = "solo" | "friends" | "new_people";
+
+/**
+ * Something the user actually went to — from an in-app event they confirmed attending,
+ * or added by hand (including from years before they used the app). Powers Wrapped
+ * and the taste profile.
+ */
+export interface Experience {
+  id: string;
+  /** Linked catalogue event, when the experience came from one. */
+  eventId: string | null;
+  title: string;
+  category: Category;
+  tags: string[];
+  venueName: string | null;
+  neighborhood: string | null;
+  city: string | null;
+  /** Local date "YYYY-MM-DD". */
+  date: string;
+  /** 1–5 stars, or null when not rated yet. */
+  rating: number | null;
+  cost: CostItem | null;
+  withWhom: WithWhom | null;
+  wasNew: boolean | null;
+  notes: string;
+  source: "app" | "manual" | "sample";
+  createdAt: string;
+  updatedAt: string;
 }

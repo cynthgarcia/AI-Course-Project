@@ -12,7 +12,24 @@ const DAY_LABEL: Record<Weekday, string> = { mon: "Mon", tue: "Tue", wed: "Wed",
 const TIMEZONES = ["Europe/London", "Europe/Dublin", "Europe/Lisbon", "Europe/Paris", "Europe/Berlin", "Europe/Madrid", "Europe/Rome", "America/New_York"];
 
 export default function SettingsPage() {
-  const { state, dispatch, snapshot } = useStore();
+  const { state, dispatch, snapshot, mode, email } = useStore();
+  const [accountBusy, setAccountBusy] = useState(false);
+  const [accountError, setAccountError] = useState<string | null>(null);
+  const signOut = async () => {
+    setAccountBusy(true);
+    await fetch("/api/auth/logout", { method: "POST" }).catch(() => undefined);
+    window.location.assign("/login");
+  };
+  const deleteAccount = async () => {
+    setAccountBusy(true);
+    setAccountError(null);
+    const res = await fetch("/api/account", { method: "DELETE" }).catch(() => null);
+    if (res?.ok) window.location.assign("/signup");
+    else {
+      setAccountError("Your account couldn't be deleted. Please try again.");
+      setAccountBusy(false);
+    }
+  };
   const { prefs } = state;
   const set = (p: Partial<Preferences>) => dispatch({ type: "setPrefs", prefs: p });
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -235,39 +252,71 @@ export default function SettingsPage() {
         )}
       </Section>
 
-      <Section title="Your data">
-        <p className="text-sm text-muted">
-          Everything is stored in this browser only. No account, no server, no analytics. Event data is sample data.
-        </p>
-        <div className="flex flex-wrap gap-2">
-          <button type="button" className={btn.secondary} onClick={download}>
-            Export my data (JSON)
-          </button>
-          {!confirmDelete ? (
-            <button type="button" className={btn.quiet} onClick={() => setConfirmDelete(true)}>
-              Delete all my data…
+      {mode === "server" ? (
+        <Section title="Account & data">
+          <p className="text-sm text-muted">
+            Signed in as <strong className="text-ink">{email}</strong>. Your data is stored in this app&rsquo;s database and only your account can read it.
+          </p>
+          <div className="flex flex-wrap gap-2">
+            <a href="/api/export" className={btn.secondary}>
+              Export my data (JSON)
+            </a>
+            <button type="button" className={btn.secondary} disabled={accountBusy} onClick={signOut}>
+              Sign out
             </button>
-          ) : (
-            <span role="alertdialog" aria-label="Confirm delete" className="flex flex-wrap items-center gap-2 rounded-lg bg-bad-soft px-3 py-2 text-sm text-bad">
-              Delete saved events, trips, plans and preferences from this browser?
-              <button
-                type="button"
-                className={btn.primary}
-                onClick={() => {
-                  clearStoredState();
-                  dispatch({ type: "reset" });
-                  setConfirmDelete(false);
-                }}
-              >
-                Delete
+            {!confirmDelete ? (
+              <button type="button" className={btn.quiet} onClick={() => setConfirmDelete(true)}>
+                Delete my account…
               </button>
-              <button type="button" className={btn.quiet} onClick={() => setConfirmDelete(false)}>
-                Cancel
+            ) : (
+              <span role="alertdialog" aria-label="Confirm delete" className="flex flex-wrap items-center gap-2 rounded-lg bg-bad-soft px-3 py-2 text-sm text-bad">
+                Permanently delete your account, history, plans and preferences? This can&rsquo;t be undone.
+                <button type="button" className={btn.primary} disabled={accountBusy} onClick={deleteAccount}>
+                  Delete permanently
+                </button>
+                <button type="button" className={btn.quiet} onClick={() => setConfirmDelete(false)}>
+                  Cancel
+                </button>
+              </span>
+            )}
+          </div>
+          {accountError && <p role="alert" className="text-sm text-bad">{accountError}</p>}
+        </Section>
+      ) : (
+      <Section title="Your data">
+          <p className="text-sm text-muted">
+            Everything is stored in this browser only. No account, no server, no analytics. Event data is sample data.
+          </p>
+          <div className="flex flex-wrap gap-2">
+            <button type="button" className={btn.secondary} onClick={download}>
+              Export my data (JSON)
+            </button>
+            {!confirmDelete ? (
+              <button type="button" className={btn.quiet} onClick={() => setConfirmDelete(true)}>
+                Delete all my data…
               </button>
-            </span>
-          )}
-        </div>
-      </Section>
+            ) : (
+              <span role="alertdialog" aria-label="Confirm delete" className="flex flex-wrap items-center gap-2 rounded-lg bg-bad-soft px-3 py-2 text-sm text-bad">
+                Delete saved events, trips, plans and preferences from this browser?
+                <button
+                  type="button"
+                  className={btn.primary}
+                  onClick={() => {
+                    clearStoredState();
+                    dispatch({ type: "reset" });
+                    setConfirmDelete(false);
+                  }}
+                >
+                  Delete
+                </button>
+                <button type="button" className={btn.quiet} onClick={() => setConfirmDelete(false)}>
+                  Cancel
+                </button>
+              </span>
+            )}
+          </div>
+        </Section>
+      )}
     </div>
   );
 }

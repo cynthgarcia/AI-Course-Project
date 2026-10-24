@@ -5,6 +5,7 @@ import { evaluateFit, type FitResult } from "./availability";
 import { costFromPrice, toBudgetAmount } from "./budget";
 import { getDestination } from "./destinations";
 import { DAY, localDate, weekdayOfDate } from "./time";
+import { buildTaste, tasteMatch, type TasteProfile } from "./taste";
 import { assessTrip, type TripAssessment } from "./trip";
 import {
   CATEGORY_LABELS,
@@ -12,6 +13,7 @@ import {
   type CategorizedInterval,
   type Category,
   type CuratorEvent,
+  type Experience,
   type FeedbackEntry,
   type Preferences,
   type SavedEvent,
@@ -31,6 +33,10 @@ export interface RankContext {
   /** Remaining monthly budget in budget currency (for budget fit). */
   remainingBudget: number;
   mode: "recommend" | "browse";
+  /** What the user actually went to, with ratings (drives the taste profile). */
+  experiences?: Experience[];
+  /** Precomputed taste profile; built from `experiences` when absent. */
+  taste?: TasteProfile;
 }
 
 export interface ScoreBreakdown {
@@ -42,6 +48,7 @@ export interface ScoreBreakdown {
   budget: number;
   social: number;
   feedback: number;
+  taste: number;
   urgency: number;
   location: number;
 }
@@ -69,6 +76,7 @@ const WEIGHTS: ScoreBreakdown = {
   budget: 10,
   social: 4,
   feedback: 10,
+  taste: 12,
   urgency: 5,
   location: 3,
 };
@@ -88,8 +96,13 @@ export function interestScore(e: CuratorEvent, prefs: Preferences): { score: num
   return { score: Math.min(1, base + Math.min(0.3, matched.length * 0.1)), matched };
 }
 
-function attendedCategories(saved: Map<string, SavedEvent>, trips: Map<string, SavedTrip>, events: Map<string, CuratorEvent>): Set<Category> {
-  const cats = new Set<Category>();
+function attendedCategories(
+  saved: Map<string, SavedEvent>,
+  trips: Map<string, SavedTrip>,
+  events: Map<string, CuratorEvent>,
+  experiences: Experience[],
+): Set<Category> {
+  const cats = new Set<Category>(experiences.filter((x) => x.source !== "sample").map((x) => x.category));
   for (const s of saved.values()) if (s.status === "attended") { const ev = events.get(s.eventId); if (ev) cats.add(ev.category); }
   for (const t of trips.values()) if (t.status === "attended") { const ev = events.get(t.eventId); if (ev) cats.add(ev.category); }
   return cats;
@@ -170,7 +183,8 @@ export function scoreEvent(e: CuratorEvent, ctx: RankContext, events: Map<string
   const interest = interestScore(e, prefs);
   if (!london && interest.score < 0.6) exclusions.push("Not a strong enough interest match to travel for.");
 
-  const attendedCats = attendedCategories(ctx.saved, ctx.trips, events);
+  const attendedCats = attendedCategories(ctx.saved, ctx.trips, events, ctx.experiences ?? []);
+  const taste = tasteMatch(e, ctx.taste ?? buildTaste(ctx.experiences ?? []));
   const isNew = !attendedCats.has(e.category) && (prefs.interests[e.category] ?? 0) <= 1;
   const newReason = isNew ? `You haven't logged a ${CATEGORY_LABELS[e.category].toLowerCase()} experience yet, and it isn't one of your usual picks.` : null;
 
@@ -191,6 +205,7 @@ export function scoreEvent(e: CuratorEvent, ctx: RankContext, events: Map<string
     budget,
     social: e.socialFit === null ? 0.5 : e.socialFit === "either" || e.socialFit === "meet_people" ? 0.8 : 0.7,
     feedback: feedbackScore(e, ctx.feedback, now),
+    taste: taste.score,
     urgency: urgencyScore(e, now),
     location: london && e.venue.area && PRIORITY_AREAS.includes(e.venue.area) ? 1 : 0,
   };
@@ -203,7 +218,7 @@ export function scoreEvent(e: CuratorEvent, ctx: RankContext, events: Map<string
     trip,
     score: Math.round(score * 10) / 10,
     breakdown,
-    whyItFits: explain(e, prefs, interest.matched, trip),
+    whyItFits: [...(taste.reason ? [taste.reason] : []), ...explain(e, prefs, interest.matched, trip)],
     isNew,
     newReason,
     exclusions,
@@ -228,7 +243,8 @@ function explain(e: CuratorEvent, prefs: Preferences, matched: string[], trip: T
 
 export function rankAll(events: CuratorEvent[], ctx: RankContext): Recommendation[] {
   const map = new Map(events.map((e) => [e.id, e]));
-  return events.map((e) => scoreEvent(e, ctx, map)).sort((a, b) => b.score - a.score);
+  const withTaste = { ...ctx, taste: ctx.taste ?? buildTaste(ctx.experiences ?? []) };
+  return events.map((e) => scoreEvent(e, withTaste, map)).sort((a, b) => b.score - a.score);
 }
 
 /**

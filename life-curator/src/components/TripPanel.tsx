@@ -9,6 +9,7 @@ import { formatDay, formatDuration, formatShortDay, formatTime } from "@/lib/dom
 import { initialTripCosts } from "@/lib/domain/trip";
 import { TRAVEL_STATUS_LABELS, type TravelStatus, type TripCosts } from "@/lib/domain/types";
 import { useStore } from "@/lib/store/AppStore";
+import { experienceFromEvent } from "@/lib/ui/experience";
 import { CostInput } from "./CostInput";
 import { Badge, btn } from "./ui";
 
@@ -36,7 +37,16 @@ export function TripPanel({ rec }: { rec: Recommendation }) {
   }
 
   const setStatus = (status: TravelStatus, override?: boolean) =>
-    dispatch({ type: "setTripStatus", eventId: event.id, category: event.category, status, initialCosts: costs, budgetOverride: override, at: now() });
+    dispatch({
+      type: "setTripStatus",
+      eventId: event.id,
+      category: event.category,
+      status,
+      initialCosts: costs,
+      budgetOverride: override,
+      experience: status === "attended" ? experienceFromEvent(event, totals.total === null ? null : { amount: totals.total, currency: prefs.budgetCurrency, basis: "user_estimate" }) : undefined,
+      at: now(),
+    });
 
   const tryPlan = () => {
     const check = checkProposal(derived.budgetForMonth(monthOf(event, tz)), totals.countedMissing.length ? null : totals.countedInBudget);

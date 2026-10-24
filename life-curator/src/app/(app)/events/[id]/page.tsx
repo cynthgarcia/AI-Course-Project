@@ -6,6 +6,7 @@ import { useState } from "react";
 import { CostInput } from "@/components/CostInput";
 import { DismissControl, PlanControl } from "@/components/EventActions";
 import { InvitationDraft } from "@/components/InvitationDraft";
+import { StarRating } from "@/components/StarRating";
 import { TripPanel } from "@/components/TripPanel";
 import { Badge, EmptyState, btn } from "@/components/ui";
 import { describeFit } from "@/lib/domain/availability";
@@ -15,6 +16,7 @@ import { canConfirmAttendance, nextLocalStatuses } from "@/lib/domain/status";
 import { formatDuration, formatShortDay, formatTime } from "@/lib/domain/time";
 import { CATEGORY_LABELS, DISMISSAL_LABELS, LOCAL_STATUS_LABELS, PROTECTED_LABELS, type CostItem, type CuratorEvent, type LocalStatus, type Reflection } from "@/lib/domain/types";
 import { useStore } from "@/lib/store/AppStore";
+import { experienceFromEvent } from "@/lib/ui/experience";
 import { durationMinutes, placeLabel, verificationLabel, whenLabel } from "@/lib/ui/format";
 
 /** Only http(s) links are ever rendered. */
@@ -225,7 +227,17 @@ function LocalPlanning({ event }: { event: CuratorEvent }) {
       {confirmAttend && (
         <div role="alertdialog" aria-label="Confirm attendance" className="flex flex-wrap items-center gap-2 rounded-lg bg-ok-soft p-3 text-sm text-ok">
           Confirm you attended?
-          <button type="button" className={btn.primary} onClick={() => { set("attended"); setConfirmAttend(false); }}>
+          <button type="button" className={btn.primary} onClick={() => {
+              dispatch({
+                type: "setStatus",
+                eventId: event.id,
+                category: event.category,
+                status: "attended",
+                experience: experienceFromEvent(event, saved?.actualCost ?? saved?.plannedCost ?? null),
+                at: at(),
+              });
+              setConfirmAttend(false);
+            }}>
             Yes, I went
           </button>
           <button type="button" className={btn.quiet} onClick={() => setConfirmAttend(false)}>
@@ -279,7 +291,11 @@ function ActualCost({ eventId, current, currency }: { eventId: string; current: 
 
 function ReflectionForm({ event, current }: { event: CuratorEvent; current: Reflection | null }) {
   const { dispatch } = useStore();
-  const [r, setR] = useState<Reflection>(current ?? { enjoyed: null, wouldRepeat: null, wasNew: null, wouldRecommend: null, notes: "" });
+  const { state } = useStore();
+  const linked = Object.values(state.experiences).find((x) => x.eventId === event.id);
+  const [r, setR] = useState<Reflection>(
+    current ?? { rating: linked?.rating ?? null, enjoyed: null, wouldRepeat: null, wasNew: null, wouldRecommend: null, notes: "" },
+  );
   const [saved, setSaved] = useState(false);
   const q: [keyof Omit<Reflection, "notes">, string][] = [
     ["enjoyed", "Did you enjoy it?"],
@@ -289,7 +305,11 @@ function ReflectionForm({ event, current }: { event: CuratorEvent; current: Refl
   ];
   return (
     <fieldset className="space-y-3 rounded-lg border border-line p-3">
-      <legend className="px-1 text-sm font-medium">Reflection (optional)</legend>
+      <legend className="px-1 text-sm font-medium">How was it?</legend>
+      <div className="space-y-1">
+        <StarRating value={r.rating ?? null} onChange={(rating) => setR({ ...r, rating })} label="Rate this experience out of 5" />
+        <p className="text-xs text-muted">Your ratings teach your recommendations what you love, and they show up in your Wrapped.</p>
+      </div>
       {q.map(([k, label]) => (
         <div key={k} className="flex flex-wrap items-center gap-3 text-sm" role="radiogroup" aria-label={label}>
           <span className="w-48">{label}</span>

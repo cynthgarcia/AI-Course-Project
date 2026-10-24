@@ -14,9 +14,12 @@
     "e2e": "playwright test"
   },
   "dependencies": {
+    "@electric-sql/pglite": "^0.2.17",
     "next": "^15.5.28",
+    "postgres": "^3.4.5",
     "react": "^19.1.1",
-    "react-dom": "^19.1.1"
+    "react-dom": "^19.1.1",
+    "zod": "^3.25.76"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3.3.7",
