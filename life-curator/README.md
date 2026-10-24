@@ -32,7 +32,8 @@ migrations run automatically on startup.
 | `POST /api/auth/signup`, `/login`, `/logout`, `GET /api/auth/me` | Accounts and sessions |
 | `GET /api/state` | The signed-in user's data |
 | `POST /api/actions` | Apply one validated change |
-| `GET /api/events` | Event catalogue (public, sample data for now) |
+| `GET /api/events` | Event catalogue and source status |
+| `POST /api/import` | Read one pasted event page into a draft (https only, public IPs only, size and time limits) |
 | `GET /api/export`, `DELETE /api/account` | Data export and account deletion |
 
 Security: same-origin checks on every state-changing request, SameSite=Lax HttpOnly cookies,
@@ -50,6 +51,12 @@ login and signup rate limits, no payload or credential logging, cascading accoun
   budget warning with intentional override, actual-cost recording, reflection, editable/copyable invitation.
 - **Trips** — whole-trip feasibility (reference journey times, overnight, leave days, conflicts, protected time),
   separate ticket/transport/accommodation/other costs with your own research estimates, travel shortlist statuses.
+- **Hobbies** — set goals (e.g. "speak confidently in public", or your own words), track hobbies
+  (curious → signed up → trying → part of my life), log your next class, rate how it's going, and get
+  suggestions ranked by interests, goals, past ratings and natural next steps (acting → improv,
+  public speaking, voice), with upcoming events that let you try each one.
+- **Add your own events** — paste a link (reads the event details many sites publish for search
+  engines) or add by hand, including invitation-only galas with a "how to get in" note. Private to you.
 - **My Life** — every status plus the travel shortlist, with search and filters.
 - **Wrapped** — your history by year (including things from before you used the app), each rated
   out of 5: totals, a persona, month-by-month chart, top-rated, categories, company, places, spend.
@@ -61,7 +68,7 @@ login and signup rate limits, no payload or credential logging, cascading accoun
 ## What is demo-only or not built
 | Area | State |
 |---|---|
-| Events | Fictional sample feeds (two, to exercise deduplication) |
+| Events | Ticketmaster and Eventbrite adapters built and tested against sample responses; they switch on with API keys. Until then, fictional sample feeds |
 | Calendar | Sample busy times or "no calendar"; Google Calendar not connected |
 | Persistence | Real database and accounts; no hosted deployment yet |
 | Travel prices | Not fetched; journey times are typical reference durations |
@@ -71,7 +78,13 @@ login and signup rate limits, no payload or credential logging, cascading accoun
 ## Needs credentials / decisions before next phases
 - **Hosting** (e.g. Vercel) and a **hosted Postgres** connection string (`DATABASE_URL`, e.g. Supabase or Neon).
 - **Google Cloud OAuth client** with the `calendar.freebusy` (or `calendar.readonly`) scope (Phase 3).
-- **Event sources**: choose permitted APIs/feeds (e.g. venue ICS feeds, Ticketmaster Discovery API — check terms) (Phase 4).
+- **Ticketmaster**: `TICKETMASTER_API_KEY` (free at developer.ticketmaster.com). Covers London plus the
+  European destinations (`TICKETMASTER_EUROPE=0` to limit to London).
+- **Eventbrite**: `EVENTBRITE_TOKEN` + `EVENTBRITE_ORGANIZER_IDS` (comma-separated). Eventbrite has no
+  public search, so it follows organisers you choose.
+- Sample events turn off automatically once a real source is set (`DEMO_EVENTS=1` keeps them).
+- Not supported, by design: DICE (no public API) and Instagram (doesn't permit reading posts) — use
+  "Add from a link" or "Add by hand". No scraping.
 - Scheduler (e.g. Vercel Cron / Supabase scheduled functions) and any notification channel (Phase 6).
 
 ## Tests

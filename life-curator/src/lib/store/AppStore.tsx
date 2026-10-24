@@ -16,6 +16,7 @@ import { DAY, addDays, localDate } from "@/lib/domain/time";
 import type { CalendarSnapshot, CategorizedInterval, CuratorEvent } from "@/lib/domain/types";
 import { collectEvents } from "@/lib/sources";
 import type { SourceRunResult } from "@/lib/sources/types";
+import { hobbyTasteEntries, type UserHobby } from "@/lib/domain/hobbies";
 import { generateWeeklyPlan } from "@/lib/domain/weeklyPlan";
 import { INITIAL_STATE, parsePersisted, reducer, type Action, type AppState } from "./state";
 
@@ -23,10 +24,19 @@ declare global {
   interface Window {
     /** Set by static preview builds that have no backend. */
     __LC_STATIC__?: boolean;
+    /** Optional first-run data for a personal static preview (applied once, on a fresh browser). */
+    __LC_SEED__?: { goals?: string[]; hobbies?: UserHobby[] };
   }
 }
 
 export type StoreMode = "server" | "local";
+
+export interface SourceStatus {
+  id: string;
+  name: string;
+  configured: boolean;
+  note: string;
+}
 
 const STORAGE_KEY = "life-curator:v1";
 
@@ -62,6 +72,8 @@ interface Store {
   storageAvailable: boolean;
   /** A bundled read-only copy of the user's real busy times, when this build has one. */
   snapshot: CalendarSnapshot | null;
+  /** Which event sources the server has configured (server mode only). */
+  sources: SourceStatus[];
   derived: Derived | null;
 }
 
@@ -88,8 +100,9 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
   const [hydrated, setHydrated] = useState(false);
   const [storageAvailable, setStorageAvailable] = useState(true);
   const [now, setNow] = useState<number | null>(null);
-  const [events, setEvents] = useState<CuratorEvent[] | null>(null);
+  const [catalogueEvents, setEvents] = useState<CuratorEvent[] | null>(null);
   const [sourceRuns, setSourceRuns] = useState<SourceRunResult[]>([]);
+  const [sources, setSources] = useState<SourceStatus[]>([]);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [snapshot] = useState<CalendarSnapshot | null>(() => readEmbeddedSnapshot());
 
@@ -115,6 +128,14 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
       try {
         const restored = parsePersisted(window.localStorage.getItem(STORAGE_KEY));
         if (restored) localDispatch({ type: "hydrate", state: restored });
+        // Applied once per browser, and never over hobbies or goals the user already has.
+        const fresh = !restored || (Object.keys(restored.hobbies).length === 0 && !restored.prefs.goals?.length);
+        if (window.__LC_SEED__ && fresh && !window.localStorage.getItem(`${STORAGE_KEY}:seeded`)) {
+          window.localStorage.setItem(`${STORAGE_KEY}:seeded`, "1");
+          const seed = window.__LC_SEED__;
+          if (seed.goals?.length) localDispatch({ type: "setPrefs", prefs: { goals: seed.goals } });
+          for (const hobby of seed.hobbies ?? []) localDispatch({ type: "addHobby", hobby });
+        }
       } catch {
         setStorageAvailable(false);
       }
@@ -166,11 +187,12 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
       mode === "server"
         ? fetch("/api/events").then(async (r) => {
             if (!r.ok) throw new Error("events");
-            return (await r.json()) as { events: CuratorEvent[]; runs: SourceRunResult[] };
+            return (await r.json()) as { events: CuratorEvent[]; runs: SourceRunResult[]; sources?: SourceStatus[] };
           })
         : collectEvents({ from: t - 14 * DAY, to: t + 120 * DAY }, t);
     load
-      .then(({ events, runs }) => {
+      .then(({ events, runs, ...rest }) => {
+        if ("sources" in rest && Array.isArray(rest.sources)) setSources(rest.sources);
         setEvents(events);
         setSourceRuns(runs);
         setLoadError(runs.every((r) => !r.ok) ? "No event sources could be loaded." : null);
@@ -179,8 +201,10 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
   }, [loadHour, mode]);
 
   const derived = useMemo<Derived | null>(() => {
-    if (now === null || events === null) return null;
+    if (now === null || catalogueEvents === null) return null;
     const { prefs } = state;
+    // The shared catalogue plus events this user added themselves.
+    const events = [...catalogueEvents, ...Object.values(state.customEvents)].sort((a, b) => Date.parse(a.start) - Date.parse(b.start));
     const calendar =
       state.calendarMode === "demo"
         ? demoCalendar(now)
@@ -203,7 +227,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
       feedback: state.feedback,
       remainingBudget: budget.remaining,
       mode: "recommend",
-      experiences: Object.values(state.experiences),
+      experiences: [...Object.values(state.experiences), ...hobbyTasteEntries(Object.values(state.hobbies))],
     };
     return {
       now,
@@ -219,7 +243,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
       browse: rankAll(events, { ...rankContext, mode: "browse" }),
       rankContext,
     };
-  }, [now, events, sourceRuns, state, snapshot]);
+  }, [now, catalogueEvents, sourceRuns, state, snapshot]);
 
   const generatePlan = useCallback(async () => {
     if (mode === "server") {
@@ -246,8 +270,8 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
   }, [mode, derived, state.prefs.timezone]);
 
   const value = useMemo<Store>(
-    () => ({ mode, state, dispatch, generatePlan, email, syncError, ready: hydrated && derived !== null, loadError, storageAvailable, snapshot, derived }),
-    [mode, state, dispatch, generatePlan, email, syncError, hydrated, derived, loadError, storageAvailable, snapshot],
+    () => ({ mode, state, dispatch, generatePlan, email, syncError, ready: hydrated && derived !== null, loadError, storageAvailable, snapshot, sources, derived }),
+    [mode, state, dispatch, generatePlan, email, syncError, hydrated, derived, loadError, storageAvailable, snapshot, sources],
   );
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }

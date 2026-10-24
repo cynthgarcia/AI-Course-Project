@@ -119,7 +119,7 @@ test("settings change recommendations and the weekly plan can be generated", asy
 
 test("no horizontal scrolling", async ({ page }) => {
   await onboard(page);
-  for (const path of ["/", "/discover", "/discover?view=travel", "/my-life", "/wrapped", "/settings", "/events/demo-paris-baroque"]) {
+  for (const path of ["/", "/discover", "/discover?view=travel", "/my-life", "/wrapped", "/hobbies", "/settings", "/events/demo-paris-baroque"]) {
     await page.goto(path);
     await page.waitForLoadState("networkidle");
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
@@ -178,4 +178,53 @@ test("wrapped: add a past experience, rate it, and see it shape suggestions", as
   // Highly rated film now explains a film recommendation.
   await page.goto("/events/demo-film-70mm");
   await expect(page.getByText(/2 film experiences 5\.0★ on average/)).toBeVisible();
+});
+
+test("hobbies: track a class, set goals, and get next-step suggestions", async ({ page }) => {
+  await onboard(page);
+  await page.goto("/hobbies");
+  await page.getByRole("button", { name: "Speak confidently in public" }).click();
+  await page.getByLabel("Your own goal").fill("Be more of a public figure");
+  await page.locator("form", { has: page.getByLabel("Your own goal") }).getByRole("button", { name: "Add" }).click();
+  await page.getByLabel("Add a hobby").fill("Acting");
+  await page.locator("form", { has: page.getByLabel("Add a hobby") }).getByRole("button", { name: "Add" }).click();
+
+  const card = page.locator("li", { has: page.getByRole("heading", { name: "Acting" }) });
+  await card.getByLabel("Status").selectOption("signed_up");
+  await card.getByLabel("I’ve done this before").check();
+  await card.getByLabel("Next class or session").fill("2026-12-01");
+  await expect(card.getByLabel("Status")).toHaveValue("signed_up");
+
+  const worth = page.locator("section", { has: page.getByRole("heading", { name: "Worth trying" }) });
+  const speaking = worth.locator("li", { has: page.getByRole("heading", { name: "Public speaking" }) });
+  await expect(speaking).toContainText("next step from acting");
+  await expect(speaking).toContainText("speak confidently in public");
+
+  await speaking.getByRole("button", { name: "I’m curious" }).click();
+  await page.reload();
+  await expect(page.locator("section", { has: page.getByRole("heading", { name: "Your hobbies" }) }).getByRole("heading", { name: "Public speaking" })).toBeVisible();
+});
+
+test("add an invitation-only gala by hand with a plan to get in", async ({ page }) => {
+  await onboard(page);
+  await page.goto("/discover");
+  await page.getByRole("button", { name: "Add an event" }).click();
+  await page.getByRole("tab", { name: "By hand" }).click();
+  await page.getByLabel("Event name").fill("Young Patrons Winter Gala");
+  await page.getByLabel("Date").fill("2026-12-12");
+  await page.getByLabel("Starts").fill("19:30");
+  await page.getByLabel("Venue").fill("A members' club");
+  await page.locator("#ev-where").selectOption("area:west_end");
+  await page.getByLabel("Who can go").selectOption("invite_only");
+  await page.getByLabel("How could you get in? (optional)").fill("Join the young patrons committee");
+  await page.getByLabel("Dress code (optional)").fill("Black tie");
+  await page.getByRole("button", { name: "Add event" }).click();
+
+  await expect(page.getByRole("heading", { name: "Young Patrons Winter Gala" })).toBeVisible();
+  await expect(page.getByText("Added by you").first()).toBeVisible();
+  await expect(page.getByText("Join the young patrons committee")).toBeVisible();
+  await expect(page.getByText("Invitation only — eligibility not established")).toBeVisible();
+
+  await page.goto("/discover");
+  await expect(page.getByRole("heading", { name: "Added by you" })).toBeVisible();
 });

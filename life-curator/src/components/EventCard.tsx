@@ -28,6 +28,8 @@ export function EventCard({ rec, showExclusions = false }: { rec: Recommendation
         <div className="flex flex-wrap items-center gap-1.5">
           <span className="text-[11px] uppercase tracking-[0.16em] text-muted">{CATEGORY_LABELS[event.category]}</span>
           {event.isDemo && <Badge tone="warn">Sample</Badge>}
+          {event.addedByUser && <Badge tone="info">Added by you</Badge>}
+          {event.eligibility === "invite_only" && <Badge>Invitation only</Badge>}
           {!rec.isLondon && <Badge tone="info">Travel-worthy</Badge>}
           {rec.isNew && (
             <Badge tone="accent" title={rec.newReason ?? undefined}>

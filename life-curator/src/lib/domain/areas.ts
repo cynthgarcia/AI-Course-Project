@@ -63,3 +63,41 @@ export function estimateTravelMinutes(from: AreaId, to: AreaId): number {
   if (from === to) return SAME_AREA_MINUTES;
   return ZONE_MINUTES[ZONE[from]][ZONE[to]];
 }
+
+/** Approximate area centres, used to place venues from their coordinates. */
+const CENTRES: Record<Exclude<AreaId, "outer_london">, [number, number]> = {
+  soho: [51.5136, -0.1365],
+  covent_garden: [51.5117, -0.124],
+  fitzrovia: [51.52, -0.138],
+  west_end: [51.5101, -0.134],
+  south_bank: [51.5055, -0.116],
+  city: [51.5155, -0.0922],
+  shoreditch: [51.5265, -0.078],
+  chelsea: [51.4875, -0.1687],
+  fulham: [51.4753, -0.2011],
+  kensington: [51.499, -0.1938],
+  camden: [51.539, -0.1426],
+  greenwich: [51.4826, -0.0077],
+};
+
+const CHARING_CROSS: [number, number] = [51.5073, -0.1276];
+
+export function distanceKm([lat1, lon1]: [number, number], [lat2, lon2]: [number, number]): number {
+  const rad = Math.PI / 180;
+  const dLat = (lat2 - lat1) * rad;
+  const dLon = (lon2 - lon1) * rad;
+  const a = Math.sin(dLat / 2) ** 2 + Math.cos(lat1 * rad) * Math.cos(lat2 * rad) * Math.sin(dLon / 2) ** 2;
+  return 6371 * 2 * Math.asin(Math.sqrt(a));
+}
+
+/** Nearest known area within 2.5 km; elsewhere inside Greater London is "outer_london"; otherwise null. */
+export function areaFromCoordinates(lat: number, lon: number): AreaId | null {
+  if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
+  let best: { area: AreaId; d: number } | null = null;
+  for (const [area, c] of Object.entries(CENTRES) as [AreaId, [number, number]][]) {
+    const d = distanceKm([lat, lon], c);
+    if (!best || d < best.d) best = { area, d };
+  }
+  if (best && best.d <= 2.5) return best.area;
+  return distanceKm([lat, lon], CHARING_CROSS) <= 25 ? "outer_london" : null;
+}

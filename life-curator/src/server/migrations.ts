@@ -68,4 +68,23 @@ export const MIGRATIONS: { id: string; statements: string[] }[] = [
       `create index experiences_user_date_idx on experiences (user_id, date)`,
     ],
   },
+  {
+    id: "0002_custom_events_hobbies",
+    statements: [
+      `create table user_events (
+        user_id uuid not null references users (id) on delete cascade,
+        id text not null,
+        data jsonb not null,
+        updated_at timestamptz not null default now(),
+        primary key (user_id, id)
+      )`,
+      `create table user_hobbies (
+        user_id uuid not null references users (id) on delete cascade,
+        id uuid not null,
+        data jsonb not null,
+        updated_at timestamptz not null default now(),
+        primary key (user_id, id)
+      )`,
+    ],
+  },
 ];

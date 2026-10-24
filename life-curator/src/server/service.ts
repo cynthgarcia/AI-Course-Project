@@ -5,18 +5,20 @@ import { summarizeMonth } from "@/lib/domain/budget";
 import type { RankContext } from "@/lib/domain/ranking";
 import { canConfirmAttendance } from "@/lib/domain/status";
 import { addDays, localDate } from "@/lib/domain/time";
+import { hobbyTasteEntries } from "@/lib/domain/hobbies";
 import { generateWeeklyPlan } from "@/lib/domain/weeklyPlan";
 import { demoCalendar, DISCONNECTED_CALENDAR } from "@/lib/data/demoCalendar";
 import { reducer, type Action, type AppState } from "@/lib/store/state";
 import { getDb } from "./db";
 import { catalogue } from "./events";
 import { loadState, persistDiff } from "./repo";
-import type { ClientAction } from "./validate";
+import { normalizeCustomEvent, type ClientAction } from "./validate";
 
 export class ActionError extends Error {}
 
 export async function rankContextFor(state: AppState, now: number): Promise<{ ctx: RankContext; events: Awaited<ReturnType<typeof catalogue>>["events"] }> {
-  const { events } = await catalogue(now);
+  const { events: shared } = await catalogue(now);
+  const events = [...shared, ...Object.values(state.customEvents)].sort((a, b) => Date.parse(a.start) - Date.parse(b.start));
   const { prefs } = state;
   const today = localDate(now, prefs.timezone);
   const eventMap = new Map(events.map((e) => [e.id, e]));
@@ -33,7 +35,7 @@ export async function rankContextFor(state: AppState, now: number): Promise<{ ct
       feedback: state.feedback,
       remainingBudget: budget.remaining,
       mode: "recommend",
-      experiences: Object.values(state.experiences),
+      experiences: [...Object.values(state.experiences), ...hobbyTasteEntries(Object.values(state.hobbies))],
     },
   };
 }
@@ -56,10 +58,15 @@ export async function applyAction(userId: string, action: ClientAction, now = Da
     } else {
       if ((action.type === "setStatus" || action.type === "setTripStatus") && action.status === "attended") {
         const { events } = await catalogue(now);
-        const ev = events.find((e) => e.id === action.eventId);
+        const ev = events.find((e) => e.id === action.eventId) ?? before.customEvents[action.eventId];
         if (!ev || !canConfirmAttendance(Date.parse(ev.start), now)) throw new ActionError("Attendance can only be confirmed after the event has started.");
       }
-      after = reducer(before, action as Action);
+      if (action.type === "addCustomEvent") {
+        if (Object.keys(before.customEvents).length >= 500) throw new ActionError("You've reached the limit of 500 added events.");
+        after = reducer(before, { type: "addCustomEvent", event: normalizeCustomEvent(action.event, now) });
+      } else {
+        after = reducer(before, action as Action);
+      }
     }
 
     await persistDiff(q, userId, before, after);

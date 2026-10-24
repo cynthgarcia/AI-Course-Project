@@ -157,3 +157,61 @@ describe("actions", () => {
     expect((await getState(req("GET", undefined, c))).status).toBe(401);
   });
 });
+
+describe("custom events and hobbies", () => {
+  const custom = (over: Record<string, unknown> = {}) => ({
+    id: `user-${randomUUID()}`,
+    title: "Patrons' winter gala",
+    description: "Seen on Instagram",
+    category: "social",
+    tags: ["gala"],
+    venue: { name: "A private members' club", address: null, neighborhood: "Mayfair", city: "London", country: "United Kingdom", area: "west_end" },
+    start: "2026-12-05T19:00:00.000Z",
+    end: null,
+    timezone: "Europe/London",
+    price: { status: "unknown", min: null, max: null, currency: "GBP", includesFees: null },
+    officialUrl: "https://example.org/gala",
+    bookingUrl: null,
+    organizer: null,
+    eligibility: "invite_only",
+    dressCode: "Black tie",
+    accessibility: null,
+    socialFit: "friends",
+    bookingDeadline: null,
+    destinationId: null,
+    accessNote: "Ask Sam about the young patrons committee",
+    ...over,
+  });
+
+  it("stores a user's own events privately, with trust fields set by the server", async () => {
+    const a = await account("lou@example.com");
+    const b = await account("max@example.com");
+    const e = custom({ isDemo: true, verification: { status: "verified" } });
+    // Unknown keys are stripped by validation; server forces unverified + addedByUser.
+    expect((await act(req("POST", { type: "addCustomEvent", event: e }, a))).status).toBe(200);
+    const aState = (await (await getState(req("GET", undefined, a))).json()).state;
+    const saved = aState.customEvents[e.id];
+    expect(saved.verification.status).toBe("unverified");
+    expect(saved.verification.sourceName).toBe("Added by you");
+    expect(saved.isDemo).toBe(false);
+    expect(saved.accessNote).toMatch(/young patrons/);
+    const bState = (await (await getState(req("GET", undefined, b))).json()).state;
+    expect(bState.customEvents).toEqual({});
+  });
+
+  it("rejects unsafe links in user events", async () => {
+    const a = await account("ned@example.com");
+    expect((await act(req("POST", { type: "addCustomEvent", event: custom({ officialUrl: "javascript:alert(1)" }) }, a))).status).toBe(400);
+  });
+
+  it("tracks hobbies and goals", async () => {
+    const a = await account("oz@example.com");
+    const id = randomUUID();
+    await act(req("POST", { type: "setPrefs", prefs: { goals: ["confidence_speaking", "Be more of a public figure"] } }, a));
+    await act(req("POST", { type: "addHobby", hobby: { id, hobbyId: "acting", name: "Acting", status: "signed_up", pastExperience: true, nextSession: "2026-11-07", rating: null, notes: "", createdAt: at, updatedAt: at } }, a));
+    await act(req("POST", { type: "updateHobby", id, patch: { status: "trying", rating: 5 }, at }, a));
+    const s = (await (await getState(req("GET", undefined, a))).json()).state;
+    expect(s.prefs.goals).toEqual(["confidence_speaking", "Be more of a public figure"]);
+    expect(s.hobbies[id]).toMatchObject({ status: "trying", rating: 5, nextSession: "2026-11-07", pastExperience: true });
+  });
+});

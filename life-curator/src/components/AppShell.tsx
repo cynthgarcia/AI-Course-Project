@@ -10,6 +10,7 @@ import { Onboarding } from "./Onboarding";
 const NAV = [
   { href: "/", label: "This Week", icon: "☀︎" },
   { href: "/discover", label: "Discover", icon: "✦" },
+  { href: "/hobbies", label: "Hobbies", icon: "◐" },
   { href: "/my-life", label: "My Life", icon: "❖" },
   { href: "/wrapped", label: "Wrapped", icon: "★" },
   { href: "/settings", label: "Settings", icon: "⚙︎" },
@@ -31,6 +32,14 @@ export function AppShell({ children }: { children: ReactNode }) {
       <header className="flex items-center justify-between gap-4 px-4 pb-2 pt-5 sm:px-6">
         <Link href="/" className="font-serif text-xl tracking-tight sm:text-2xl">
           Your Life <span className="italic text-accent">Curator</span>
+        </Link>
+        <Link
+          href="/settings"
+          aria-label="Settings"
+          aria-current={isActive(path, "/settings") ? "page" : undefined}
+          className={`rounded-full px-2 py-1 text-lg sm:hidden ${isActive(path, "/settings") ? "text-accent" : "text-muted"}`}
+        >
+          ⚙︎
         </Link>
         <nav aria-label="Main" className="hidden sm:block">
           <ul className="flex gap-1 text-sm">
@@ -77,9 +86,9 @@ export function AppShell({ children }: { children: ReactNode }) {
         )}
       </main>
 
-      <nav aria-label="Main" className="fixed inset-x-0 bottom-0 z-40 border-t border-line bg-card/95 pb-[env(safe-area-inset-bottom,0px)] backdrop-blur sm:hidden">
+      <nav aria-label="Main mobile" className="fixed inset-x-0 bottom-0 z-40 border-t border-line bg-card/95 pb-[env(safe-area-inset-bottom,0px)] backdrop-blur sm:hidden">
         <ul className="mx-auto flex max-w-md justify-around">
-          {NAV.map((n) => (
+          {NAV.filter((n) => n.href !== "/settings").map((n) => (
             <li key={n.href} className="flex-1">
               <Link
                 href={n.href}

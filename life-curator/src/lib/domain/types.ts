@@ -123,6 +123,10 @@ export interface CuratorEvent {
   /** Groups multiple performances of the same production. */
   occurrenceGroupId: string | null;
   sourceRecords: SourceRecord[];
+  /** How to get in when attendance is restricted (e.g. "Buy a table via the charity"). User-entered. */
+  accessNote?: string | null;
+  /** Added by the user (by hand or from a link) — only visible to them. */
+  addedByUser?: boolean;
 }
 
 export interface Interval {
@@ -196,6 +200,8 @@ export interface Preferences {
   digestDay: Weekday;
   digestTime: string;
   protectedBlocks: TimeBlock[];
+  /** What the user wants more of in life — goal keys (see hobbies.ts) or their own words. */
+  goals: string[];
   weeklyFunIntention: boolean;
   monthlyNewIntention: boolean;
 }

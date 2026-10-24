@@ -23,6 +23,7 @@ under user control: **no bookings, purchases, calendar writes or messages in the
 | One plan per week, run history, safe retry | `src/lib/domain/weeklyPlan.ts` |
 | Taste profile from 1–5★ ratings (shrunk toward neutral, samples excluded) | `src/lib/domain/taste.ts` |
 | Wrapped yearly summary (no invented costs) | `src/lib/domain/wrapped.ts` |
+| Hobby recommendations (interests, goals, ratings, progression) | `src/lib/domain/hobbies.ts` |
 
 ## Data honesty
 - Sample events are fictional, badged "Sample" everywhere, and carry no official/booking links,
@@ -43,7 +44,7 @@ This Week (`/`), Discover (`/discover`, with Europe tab), My Life (`/my-life`), 
 | 1 Functional core app (demo data, local persistence) | Done |
 | 2 Persistence & auth | Done: Postgres (PGlite locally / DATABASE_URL in prod), email+password accounts, per-user scoping |
 | 3 Google Calendar read-only free/busy | Not started — needs OAuth credentials |
-| 4 Real event sources | Adapter interface ready (`src/lib/sources/types.ts`); no real adapters |
+| 4 Real event sources | Ticketmaster + Eventbrite (organisers) adapters, link import, manual add; stale-tolerant catalogue. Needs API keys to go live |
 | 5 Recommendation engine | Deterministic engine done; AI explanations optional/not used |
 | 6 Digest automation | Manual generation + run history only; no scheduler, nothing is sent |
 | 7 Quality & deployment prep | Unit + browser tests in place; no deployment |

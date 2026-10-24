@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { useState } from "react";
 import { CostInput } from "@/components/CostInput";
 import { DismissControl, PlanControl } from "@/components/EventActions";
@@ -55,6 +55,7 @@ export default function EventDetailPage() {
         <div className="flex flex-wrap items-center gap-1.5">
           <span className="text-[11px] uppercase tracking-[0.16em] text-muted">{CATEGORY_LABELS[event.category]}</span>
           {event.isDemo && <Badge tone="warn">Sample event — fictional</Badge>}
+          {event.addedByUser && <Badge tone="info">Added by you</Badge>}
           {!rec.isLondon && <Badge tone="info">Travel-worthy</Badge>}
           {rec.isNew && <Badge tone="accent">New for you</Badge>}
         </div>
@@ -84,6 +85,12 @@ export default function EventDetailPage() {
           </dd>
           <dt className="text-muted">Who can attend</dt>
           <dd>{{ public: "Open to the public", members: "Members only", invite_only: "Invitation only — eligibility not established", unknown: "Not confirmed" }[event.eligibility]}</dd>
+          {event.accessNote && (
+            <>
+              <dt className="text-muted">How to get in</dt>
+              <dd>{event.accessNote}</dd>
+            </>
+          )}
           {event.dressCode && (
             <>
               <dt className="text-muted">Dress code</dt>
@@ -181,6 +188,8 @@ export default function EventDetailPage() {
       {rec.isLondon ? <LocalPlanning event={event} /> : <TripPanel rec={browseRec} />}
 
       <InvitationDraft event={event} />
+
+      {event.addedByUser && <RemoveCustomEvent id={event.id} />}
     </article>
   );
 }
@@ -337,5 +346,37 @@ function ReflectionForm({ event, current }: { event: CuratorEvent; current: Refl
       </button>
       {saved && <p role="status" className="text-xs text-muted">Saved.</p>}
     </fieldset>
+  );
+}
+
+function RemoveCustomEvent({ id }: { id: string }) {
+  const { dispatch } = useStore();
+  const router = useRouter();
+  const [confirm, setConfirm] = useState(false);
+  return (
+    <div className="border-t border-line pt-4 text-sm">
+      {confirm ? (
+        <span className="flex flex-wrap items-center gap-2">
+          Remove this event you added?
+          <button
+            type="button"
+            className={btn.secondary}
+            onClick={() => {
+              dispatch({ type: "deleteCustomEvent", id });
+              router.push("/discover");
+            }}
+          >
+            Remove
+          </button>
+          <button type="button" className={btn.quiet} onClick={() => setConfirm(false)}>
+            Keep
+          </button>
+        </span>
+      ) : (
+        <button type="button" className={btn.quiet} onClick={() => setConfirm(true)}>
+          Remove this event
+        </button>
+      )}
+    </div>
   );
 }

@@ -1,6 +1,7 @@
 // Maps the app state to database rows. Every query is scoped to one user_id.
 import { DEFAULT_PREFERENCES } from "@/lib/data/defaults";
-import type { Experience, SavedEvent, SavedTrip } from "@/lib/domain/types";
+import type { UserHobby } from "@/lib/domain/hobbies";
+import type { CuratorEvent, Experience, SavedEvent, SavedTrip } from "@/lib/domain/types";
 import { INITIAL_STATE, STATE_VERSION, type AppState } from "@/lib/store/state";
 import type { Queryable } from "./db";
 
@@ -54,9 +55,13 @@ export async function loadState(q: Queryable, userId: string, lock = false): Pro
        from experiences where user_id = $1 order by date desc`,
     [userId],
   );
+  const customEvents = await q.query<{ id: string; data: CuratorEvent }>("select id, data from user_events where user_id = $1", [userId]);
+  const hobbies = await q.query<{ id: string; data: UserHobby }>("select id, data from user_hobbies where user_id = $1", [userId]);
   return {
     ...INITIAL_STATE,
     version: STATE_VERSION,
+    customEvents: Object.fromEntries(customEvents.map((r) => [r.id, r.data])),
+    hobbies: Object.fromEntries(hobbies.map((r) => [r.id, r.data])),
     onboarded: p.onboarded,
     calendarMode: p.calendar_mode,
     prefs: { ...DEFAULT_PREFERENCES, ...p.prefs, interests: { ...DEFAULT_PREFERENCES.interests, ...(p.prefs.interests ?? {}) } },
@@ -133,6 +138,23 @@ export async function persistDiff(q: Queryable, userId: string, before: AppState
     }
     for (const eventId of Object.keys(b)) {
       if (!(eventId in a)) await q.query(`delete from ${table} where user_id = $1 and event_id = $2`, [userId, eventId]);
+    }
+  }
+
+  for (const [table, b, a] of [
+    ["user_events", before.customEvents, after.customEvents],
+    ["user_hobbies", before.hobbies, after.hobbies],
+  ] as const) {
+    for (const [id, row] of Object.entries(a)) {
+      if (same(b[id], row)) continue;
+      await q.query(
+        `insert into ${table} (user_id, id, data, updated_at) values ($1, $2, $3::jsonb, now())
+         on conflict (user_id, id) do update set data = excluded.data, updated_at = now()`,
+        [userId, id, JSON.stringify(row)],
+      );
+    }
+    for (const id of Object.keys(b)) {
+      if (!(id in a)) await q.query(`delete from ${table} where user_id = $1 and id = $2`, [userId, id]);
     }
   }
 

@@ -2,8 +2,9 @@
 
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useMemo, useState } from "react";
+import { AddEventPanel } from "@/components/AddEventPanel";
 import { EventCard } from "@/components/EventCard";
-import { EmptyState, Notice } from "@/components/ui";
+import { EmptyState, Notice, btn } from "@/components/ui";
 import { AREA_LABELS } from "@/lib/domain/areas";
 import { costFromPrice, toBudgetAmount, tripTotal } from "@/lib/domain/budget";
 import type { Recommendation } from "@/lib/domain/ranking";
@@ -49,6 +50,7 @@ function Discover() {
   const [deadlineSoon, setDeadlineSoon] = useState(false);
   const [strongOnly, setStrongOnly] = useState(false);
   const [oneOff, setOneOff] = useState(false);
+  const [adding, setAdding] = useState(false);
 
   const results = useMemo(() => {
     if (!derived) return [];
@@ -96,6 +98,7 @@ function Discover() {
   }, [derived, browseProtected, days, view, category, social, newOnly, dayType, duration, maxPrice, fitsOnly, area, city, weekendOnly, directOnly, strongOnly, oneOff, deadlineSoon, maxTrip, prefs, state.trips]);
 
   if (!derived) return null;
+  const mine = derived.browse.filter((r) => r.event.addedByUser && Date.parse(r.event.start) > derived.now && (view === "local" ? r.isLondon : !r.isLondon));
   const cities = [...new Map(derived.events.filter((e) => e.destinationId).map((e) => [e.destinationId!, `${e.venue.city}, ${e.venue.country}`])).entries()];
 
   return (
@@ -110,6 +113,7 @@ function Discover() {
         </p>
       </div>
 
+      <div className="flex flex-wrap items-center justify-between gap-3">
       <div role="tablist" aria-label="Discover view" className="inline-flex rounded-full border border-line bg-card p-1 text-sm">
         {(["local", "travel"] as const).map((v) => (
           <button
@@ -126,6 +130,26 @@ function Discover() {
           </button>
         ))}
       </div>
+        <button type="button" className={adding ? btn.quiet : btn.secondary} onClick={() => setAdding((a) => !a)} aria-expanded={adding}>
+          {adding ? "Close" : "Add an event"}
+        </button>
+      </div>
+
+      {adding && <AddEventPanel onDone={(id) => router.push(`/events/${encodeURIComponent(id)}`)} />}
+
+      {mine.length > 0 && (
+        <section aria-labelledby="mine" className="space-y-3">
+          <h2 id="mine" className="font-serif text-2xl">
+            Added by you
+          </h2>
+          <p className="text-sm text-muted">Events you found yourself. They&rsquo;re only visible to you, and always shown here even when they don&rsquo;t fit your filters.</p>
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            {mine.map((r) => (
+              <EventCard key={r.event.id} rec={r} showExclusions />
+            ))}
+          </div>
+        </section>
+      )}
 
       <details className="rounded-xl border border-line bg-card p-4" open>
         <summary className="cursor-pointer font-medium">Filters</summary>

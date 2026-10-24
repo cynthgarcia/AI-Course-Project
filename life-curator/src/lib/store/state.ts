@@ -5,6 +5,7 @@ import { canTransition, canTransitionTrip } from "@/lib/domain/status";
 import type {
   Category,
   CostItem,
+  CuratorEvent,
   DismissalReason,
   Experience,
   FeedbackEntry,
@@ -16,6 +17,7 @@ import type {
   TravelStatus,
   TripCosts,
 } from "@/lib/domain/types";
+import type { UserHobby } from "@/lib/domain/hobbies";
 import { upsertPlan, type PlanRun, type WeeklyPlan } from "@/lib/domain/weeklyPlan";
 
 export const STATE_VERSION = 1;
@@ -35,6 +37,9 @@ export interface AppState {
   plans: WeeklyPlan[];
   runs: PlanRun[];
   experiences: Record<string, Experience>;
+  /** Events the user added by hand or from a link. Private to them. */
+  customEvents: Record<string, CuratorEvent>;
+  hobbies: Record<string, UserHobby>;
 }
 
 export const INITIAL_STATE: AppState = {
@@ -48,7 +53,11 @@ export const INITIAL_STATE: AppState = {
   plans: [],
   runs: [],
   experiences: {},
+  customEvents: {},
+  hobbies: {},
 };
+
+export type HobbyPatch = Partial<Pick<UserHobby, "name" | "status" | "pastExperience" | "nextSession" | "rating" | "notes">>;
 
 export type ExperiencePatch = Partial<
   Pick<Experience, "title" | "category" | "tags" | "venueName" | "neighborhood" | "city" | "date" | "rating" | "cost" | "withWhom" | "wasNew" | "notes">
@@ -85,6 +94,11 @@ export type Action =
   | { type: "addExperience"; experience: Experience }
   | { type: "updateExperience"; id: string; patch: ExperiencePatch; at: string }
   | { type: "deleteExperience"; id: string }
+  | { type: "addCustomEvent"; event: CuratorEvent }
+  | { type: "deleteCustomEvent"; id: string }
+  | { type: "addHobby"; hobby: UserHobby }
+  | { type: "updateHobby"; id: string; patch: HobbyPatch; at: string }
+  | { type: "removeHobby"; id: string }
   | { type: "reset" };
 
 function linkedExperience(state: AppState, eventId: string): Experience | undefined {
@@ -250,6 +264,32 @@ export function reducer(state: AppState, action: Action): AppState {
     case "deleteExperience": {
       const { [action.id]: _removed, ...rest } = state.experiences;
       return { ...state, experiences: rest };
+    }
+    case "addCustomEvent": {
+      const e = action.event;
+      if (state.customEvents[e.id]) return state;
+      return { ...state, customEvents: { ...state.customEvents, [e.id]: { ...e, addedByUser: true, isDemo: false } } };
+    }
+    case "deleteCustomEvent": {
+      const { [action.id]: _removed, ...rest } = state.customEvents;
+      return { ...state, customEvents: rest };
+    }
+    case "addHobby": {
+      const h = action.hobby;
+      // One tracker entry per catalogue hobby.
+      if (state.hobbies[h.id] || (h.hobbyId && Object.values(state.hobbies).some((x) => x.hobbyId === h.hobbyId))) return state;
+      return { ...state, hobbies: { ...state.hobbies, [h.id]: { ...h, rating: normalizeRating(h.rating) } } };
+    }
+    case "updateHobby": {
+      const current = state.hobbies[action.id];
+      if (!current) return state;
+      const patch = { ...action.patch };
+      if ("rating" in patch) patch.rating = normalizeRating(patch.rating ?? null);
+      return { ...state, hobbies: { ...state.hobbies, [action.id]: { ...current, ...patch, updatedAt: action.at } } };
+    }
+    case "removeHobby": {
+      const { [action.id]: _removed, ...rest } = state.hobbies;
+      return { ...state, hobbies: rest };
     }
     case "reset":
       return INITIAL_STATE;

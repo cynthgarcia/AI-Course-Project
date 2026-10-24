@@ -55,6 +55,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
   digestDay: "thu",
   digestTime: "15:00",
   protectedBlocks: DEFAULT_PROTECTED_BLOCKS,
+  goals: [],
   weeklyFunIntention: true,
   monthlyNewIntention: true,
 };

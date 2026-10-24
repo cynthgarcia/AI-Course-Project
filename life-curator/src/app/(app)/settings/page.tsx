@@ -12,7 +12,7 @@ const DAY_LABEL: Record<Weekday, string> = { mon: "Mon", tue: "Tue", wed: "Wed",
 const TIMEZONES = ["Europe/London", "Europe/Dublin", "Europe/Lisbon", "Europe/Paris", "Europe/Berlin", "Europe/Madrid", "Europe/Rome", "America/New_York"];
 
 export default function SettingsPage() {
-  const { state, dispatch, snapshot, mode, email } = useStore();
+  const { state, dispatch, snapshot, mode, email, sources } = useStore();
   const [accountBusy, setAccountBusy] = useState(false);
   const [accountError, setAccountError] = useState<string | null>(null);
   const signOut = async () => {
@@ -113,6 +113,26 @@ export default function SettingsPage() {
           </div>
         </div>
       </Section>
+
+      {mode === "server" && (
+        <Section title="Event sources">
+          <p className="text-sm text-muted">Where events come from. Keys are set on the server by whoever runs the app, never in the browser.</p>
+          <ul className="divide-y divide-line rounded-lg border border-line bg-card text-sm">
+            {sources.map((s) => (
+              <li key={s.id} className="flex flex-wrap items-baseline justify-between gap-2 px-3 py-2">
+                <span className="font-medium">{s.name}</span>
+                <span className={s.configured ? "text-ok" : "text-muted"}>
+                  {s.configured ? "On" : "Not set up"} · {s.note}
+                </span>
+              </li>
+            ))}
+            <li className="flex flex-wrap items-baseline justify-between gap-2 px-3 py-2">
+              <span className="font-medium">DICE, Instagram and anything else</span>
+              <span className="text-muted">Add from a link or by hand in Discover — these don&rsquo;t offer apps a way to search their events</span>
+            </li>
+          </ul>
+        </Section>
+      )}
 
       <Section title="Protected time">
         <p className="text-sm text-muted">
