@@ -84,6 +84,10 @@ logging, cascading account deletion. Changes made together are saved as one atom
 ## Needs credentials / decisions before next phases
 - **Hosting** (e.g. Vercel) and a **hosted Postgres** connection string (`DATABASE_URL`, e.g. Supabase or Neon).
 - **Google Cloud OAuth client** with the `calendar.freebusy` (or `calendar.readonly`) scope (Phase 3).
+- **Built in, automatic**: Luma's London feed plus ~25 curated London venues (classical, jazz, theatre,
+  galleries, talks, film), read daily from their published event data with robots.txt respected.
+- **AI scout** (optional, `ANTHROPIC_API_KEY` + `SCOUT_ENABLED=1`): Claude (`claude-opus-5-5`, web search)
+  proposes events twice a week; the app keeps only those confirmed by the organiser's own page.
 - **Ticketmaster**: `TICKETMASTER_API_KEY` (free at developer.ticketmaster.com). Covers London plus the
   European destinations (`TICKETMASTER_EUROPE=0` to limit to London).
 - **Eventbrite**: `EVENTBRITE_TOKEN` + `EVENTBRITE_ORGANIZER_IDS` (comma-separated). Eventbrite has no

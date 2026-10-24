@@ -22,6 +22,6 @@ export default defineConfig({
         port,
         reuseExistingServer: true,
         timeout: 60_000,
-        env: { DATA_DIR: "memory://", SIGNUP_RATE_LIMIT: "1000", NEXT_TELEMETRY_DISABLED: "1" },
+        env: { DATA_DIR: "memory://", SIGNUP_RATE_LIMIT: "1000", NEXT_TELEMETRY_DISABLED: "1", CURATED_SOURCES: "0" },
       },
 });

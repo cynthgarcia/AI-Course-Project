@@ -73,8 +73,8 @@ export async function buildCatalogue(sources: EventSourceAdapter[], now: number)
   let rows = await db.query<Row>("select source_id, events, fetched_at, last_attempt_at, last_error from event_cache where source_id = any(string_to_array($1, ','))", [ids.join(",")]);
   const byId = new Map(rows.map((r) => [r.source_id, r]));
 
-  // Never fetched: fetch now so the first visitor sees events.
-  const missing = sources.filter((s) => ms(byId.get(s.id)?.fetched_at ?? null) === null && !byId.get(s.id)?.last_error);
+  // Never fetched: fetch now so the first visitor sees events (slow sources stay in the background).
+  const missing = sources.filter((s) => !s.backgroundOnly && ms(byId.get(s.id)?.fetched_at ?? null) === null && !byId.get(s.id)?.last_error);
   if (missing.length) {
     await refreshSources(missing, now);
     rows = await db.query<Row>("select source_id, events, fetched_at, last_attempt_at, last_error from event_cache where source_id = any(string_to_array($1, ','))", [ids.join(",")]);
@@ -82,7 +82,7 @@ export async function buildCatalogue(sources: EventSourceAdapter[], now: number)
   // Due for a refresh: serve what we have, refresh after responding.
   const due = sources.filter((s) => {
     const f = ms(rows.find((r) => r.source_id === s.id)?.fetched_at ?? null);
-    return f === null || now - f > REFRESH_AFTER;
+    return f === null || now - f > (s.refreshHours !== undefined ? s.refreshHours * HOUR : REFRESH_AFTER);
   });
   if (due.length) {
     try {
@@ -111,7 +111,11 @@ export async function buildCatalogue(sources: EventSourceAdapter[], now: number)
       stale,
     });
   }
-  return { events: dedupeEvents(all).sort((a, b) => Date.parse(a.start) - Date.parse(b.start)), runs };
+  // Sample events are a fallback: shown only while no real source has produced anything.
+  const real = all.filter((e) => !e.isDemo);
+  const keepDemo = process.env.DEMO_EVENTS === "1";
+  const chosen = real.length && !keepDemo ? real : all;
+  return { events: dedupeEvents(chosen).sort((a, b) => Date.parse(a.start) - Date.parse(b.start)), runs };
 }
 
 /** Catalogue for the configured sources, memoised briefly per instance. */
@@ -121,6 +125,7 @@ export async function catalogue(now = Date.now()): Promise<Catalogue> {
   if (memo && memo.key === key && now - memo.at < 60_000) return memo.value;
   const value = await buildCatalogue(sources, now);
   // Only remember complete results, so a source still loading is retried on the next request.
-  if (value.runs.every((r) => r.ok || r.error)) memo = { at: now, key, value };
+  const settled = value.runs.every((r, i) => r.ok || r.error || sources[i]?.backgroundOnly);
+  if (settled) memo = { at: now, key, value };
   return value;
 }

@@ -20,9 +20,10 @@ About 15 minutes. Your secrets go straight into Vercel; nobody else needs to see
    | `DATABASE_URL` | the Supabase transaction-pooler URI from step 1 | **Yes** |
    | `CRON_SECRET` | any random string of 32+ characters (e.g. from a password manager) | **Yes** — protects the scheduled jobs |
    | `SIGNUP_INVITE_CODE` | a code you share with friends | Recommended while it's private |
-   | `TICKETMASTER_API_KEY` | free key from developer.ticketmaster.com | For real events |
-   | `EVENT_ICS_FEEDS` | `Name|https://…ics` entries, one per line | Optional — Luma, Meetup, venue calendars |
-   | `EVENT_PAGES` | `Name|https://…` venue "What's on" pages | Optional |
+   | `TICKETMASTER_API_KEY` | free key from developer.ticketmaster.com | Recommended — concerts, West End, Europe |
+   | `ANTHROPIC_API_KEY` + `SCOUT_ENABLED=1` | key from console.anthropic.com | Optional — the AI scout (small cost per run, see below) |
+   | `EVENT_ICS_FEEDS` | `Name|https://…ics` entries, one per line | Optional extras |
+   | `EVENT_PAGES` | `Name|https://…` venue "What's on" pages | Optional extras |
    | `EVENTBRITE_TOKEN`, `EVENTBRITE_ORGANIZER_IDS` | private token + organiser IDs | Optional |
 
 4. **Deploy.**
@@ -50,6 +51,21 @@ Then go to `/signup`, create your account (with the invite code if you set one) 
 | `/api/cron/weekly-plans` | daily 14:07 | For people whose digest day is today, prepares this week's plan once. Nothing is sent. |
 
 Vercel's free (Hobby) plan allows daily jobs, which is why both run once a day.
+
+## Where events come from (automatically)
+Nothing needs to be added by hand. Out of the box the app reads:
+- **Luma — London**: the public London feed on Luma (AI, founders, talks, wellness, creative).
+- **About 25 London venues** picked for your interests (`src/server/curatedSources.ts`): it reads the
+  event details each venue publishes for search engines, checks robots.txt first, reads slowly, once a day.
+- **Ticketmaster**, once `TICKETMASTER_API_KEY` is set.
+- **AI scout**, if enabled: Claude searches the web twice a week (Eventbrite, DICE, Fever, venue sites…)
+  for events matching your interests. The app then opens each event page itself and keeps an event only
+  if that page confirms it — nothing the AI says is shown as fact. Roughly $0.20–0.50 per run, about
+  $2–4 a month. Change what it looks for with `SCOUT_BRIEF`.
+
+Sources that publish nothing readable just contribute nothing; Settings → Event sources shows status.
+Sample events appear only until real events have loaded. Set `CURATED_SOURCES=0` to turn the built-in
+list off.
 
 ## Good to know
 - **Cost:** Vercel Hobby and Supabase Free cover this comfortably. Vercel Hobby is for
