@@ -37,7 +37,7 @@ interface ExperienceRow {
 const iso = (d: Date | string) => (d instanceof Date ? d.toISOString() : new Date(d).toISOString());
 
 export async function createProfile(q: Queryable, userId: string): Promise<void> {
-  await q.query("insert into profiles (user_id, prefs) values ($1, $2::jsonb)", [userId, JSON.stringify(NEW_ACCOUNT_PREFERENCES)]);
+  await q.query("insert into profiles (user_id, prefs) values ($1, $2::text::jsonb)", [userId, JSON.stringify(NEW_ACCOUNT_PREFERENCES)]);
 }
 
 /** Loads a user's state; `lock` serialises concurrent writes for the same user. */
@@ -110,8 +110,8 @@ export async function persistDiff(q: Queryable, userId: string, before: AppState
     !same(before.runs, after.runs)
   ) {
     await q.query(
-      `update profiles set onboarded = $2, calendar_mode = $3, prefs = $4::jsonb, feedback = $5::jsonb, plans = $6::jsonb,
-              runs = $7::jsonb, updated_at = now() where user_id = $1`,
+      `update profiles set onboarded = $2, calendar_mode = $3, prefs = $4::text::jsonb, feedback = $5::text::jsonb, plans = $6::text::jsonb,
+              runs = $7::text::jsonb, updated_at = now() where user_id = $1`,
       [
         userId,
         after.onboarded,
@@ -131,7 +131,7 @@ export async function persistDiff(q: Queryable, userId: string, before: AppState
     for (const [eventId, row] of Object.entries(a)) {
       if (same(b[eventId], row)) continue;
       await q.query(
-        `insert into ${table} (user_id, event_id, status, data, updated_at) values ($1, $2, $3, $4::jsonb, now())
+        `insert into ${table} (user_id, event_id, status, data, updated_at) values ($1, $2, $3, $4::text::jsonb, now())
          on conflict (user_id, event_id) do update set status = excluded.status, data = excluded.data, updated_at = now()`,
         [userId, eventId, row.status, JSON.stringify(row)],
       );
@@ -148,7 +148,7 @@ export async function persistDiff(q: Queryable, userId: string, before: AppState
     for (const [id, row] of Object.entries(a)) {
       if (same(b[id], row)) continue;
       await q.query(
-        `insert into ${table} (user_id, id, data, updated_at) values ($1, $2, $3::jsonb, now())
+        `insert into ${table} (user_id, id, data, updated_at) values ($1, $2, $3::text::jsonb, now())
          on conflict (user_id, id) do update set data = excluded.data, updated_at = now()`,
         [userId, id, JSON.stringify(row)],
       );
@@ -163,7 +163,7 @@ export async function persistDiff(q: Queryable, userId: string, before: AppState
     await q.query(
       `insert into experiences (user_id, id, event_id, title, category, tags, venue_name, neighborhood, city, date, rating, cost,
                                 with_whom, was_new, notes, source, created_at, updated_at)
-       values ($1, $2, $3, $4, $5, $6::jsonb, $7, $8, $9, $10::date, $11, $12::jsonb, $13, $14, $15, $16, $17, $18)
+       values ($1, $2, $3, $4, $5, $6::text::jsonb, $7, $8, $9, $10::date, $11, $12::text::jsonb, $13, $14, $15, $16, $17, $18)
        on conflict (user_id, id) do update set
          event_id = excluded.event_id, title = excluded.title, category = excluded.category, tags = excluded.tags,
          venue_name = excluded.venue_name, neighborhood = excluded.neighborhood, city = excluded.city, date = excluded.date,

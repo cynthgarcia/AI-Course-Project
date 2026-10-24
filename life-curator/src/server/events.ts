@@ -54,7 +54,7 @@ async function refreshSource(src: EventSourceAdapter, now: number, force: boolea
   const t = Math.floor(now / HOUR) * HOUR;
   const { events, runs } = await collectEvents({ from: t - 14 * DAY, to: t + 120 * DAY }, now, [src]);
   if (runs[0]?.ok) {
-    await db.query("update event_cache set events = $2::jsonb, fetched_at = now(), last_error = null where source_id = $1", [src.id, JSON.stringify(events)]);
+    await db.query("update event_cache set events = $2::text::jsonb, fetched_at = now(), last_error = null where source_id = $1", [src.id, JSON.stringify(events)]);
   } else {
     await db.query("update event_cache set last_error = $2 where source_id = $1", [src.id, runs[0]?.error ?? `${src.name} could not be loaded.`]);
   }

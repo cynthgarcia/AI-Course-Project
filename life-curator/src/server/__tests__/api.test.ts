@@ -249,3 +249,19 @@ describe("batches and invites", () => {
     }
   });
 });
+
+describe("scheduled weekly plans", () => {
+  it("prepares a plan on the user's digest day, once per week", async () => {
+    const { runScheduledPlans } = await import("@/server/service");
+    const { localDate, weekdayOfDate } = await import("@/lib/domain/time");
+    const c = await account("sam@example.com");
+    const today = weekdayOfDate(localDate(Date.now(), "Europe/London"));
+    await act(req("POST", { actions: [{ type: "setPrefs", prefs: { digestDay: today, digestEnabled: true } }, { type: "completeOnboarding" }] }, c));
+    const first = await runScheduledPlans();
+    expect(first.generated).toBeGreaterThanOrEqual(1);
+    const state = (await (await getState(req("GET", undefined, c))).json()).state;
+    expect(state.runs[0]).toMatchObject({ trigger: "scheduled", outcome: "generated" });
+    const second = await runScheduledPlans();
+    expect(second.generated).toBe(0);
+  });
+});
