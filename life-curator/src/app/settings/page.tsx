@@ -12,7 +12,7 @@ const DAY_LABEL: Record<Weekday, string> = { mon: "Mon", tue: "Tue", wed: "Wed",
 const TIMEZONES = ["Europe/London", "Europe/Dublin", "Europe/Lisbon", "Europe/Paris", "Europe/Berlin", "Europe/Madrid", "Europe/Rome", "America/New_York"];
 
 export default function SettingsPage() {
-  const { state, dispatch } = useStore();
+  const { state, dispatch, snapshot } = useStore();
   const { prefs } = state;
   const set = (p: Partial<Preferences>) => dispatch({ type: "setPrefs", prefs: p });
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -77,10 +77,14 @@ export default function SettingsPage() {
 
       <Section title="Calendar">
         <div className="space-y-2">
-          {(["demo", "disconnected"] as const).map((m) => (
+          {(snapshot ? (["snapshot", "demo", "disconnected"] as const) : (["demo", "disconnected"] as const)).map((m) => (
             <label key={m} className="flex cursor-pointer gap-3 rounded-lg border border-line bg-card p-3 text-sm">
               <input type="radio" name="calmode" checked={state.calendarMode === m} onChange={() => dispatch({ type: "setCalendarMode", mode: m })} className="accent-[var(--accent)]" />
-              {m === "demo" ? "Sample calendar (made-up busy times)" : "No calendar — suggested times are unverified"}
+              {m === "snapshot"
+                ? `My Google Calendar busy times (read-only copy from ${snapshot?.fetchedAt ? new Date(snapshot.fetchedAt).toLocaleDateString("en-GB", { day: "numeric", month: "short" }) : "?"}, not live)`
+                : m === "demo"
+                  ? "Sample calendar (made-up busy times)"
+                  : "No calendar — suggested times are unverified"}
             </label>
           ))}
           <div className="rounded-lg border border-dashed border-line p-3 text-sm text-muted">

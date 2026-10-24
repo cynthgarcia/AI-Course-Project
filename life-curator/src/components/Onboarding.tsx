@@ -5,9 +5,9 @@ import { formatMoney } from "@/lib/domain/budget";
 import { useStore } from "@/lib/store/AppStore";
 
 export function Onboarding() {
-  const { state, dispatch } = useStore();
+  const { state, dispatch, snapshot } = useStore();
   const { prefs } = state;
-  const [calendar, setCalendar] = useState<"demo" | "disconnected">(state.calendarMode);
+  const [calendar, setCalendar] = useState<"demo" | "snapshot" | "disconnected">(snapshot ? "snapshot" : state.calendarMode);
 
   return (
     <section aria-labelledby="welcome" className="mx-auto max-w-xl space-y-6 py-4">
@@ -39,6 +39,17 @@ export function Onboarding() {
 
       <fieldset className="space-y-2">
         <legend className="mb-2 font-serif text-lg">Calendar</legend>
+        {snapshot && (
+          <label className="flex cursor-pointer gap-3 rounded-lg border border-line bg-card p-3">
+            <input type="radio" name="cal" checked={calendar === "snapshot"} onChange={() => setCalendar("snapshot")} className="mt-1 accent-[var(--accent)]" />
+            <span>
+              <span className="font-medium">Use my Google Calendar busy times</span>
+              <span className="block text-sm text-muted">
+                A read-only copy taken {snapshot.fetchedAt ? new Date(snapshot.fetchedAt).toLocaleDateString("en-GB", { day: "numeric", month: "long" }) : ""}. Only start and end times — no titles or details. It won&rsquo;t update by itself.
+              </span>
+            </span>
+          </label>
+        )}
         <label className="flex cursor-pointer gap-3 rounded-lg border border-line bg-card p-3">
           <input type="radio" name="cal" checked={calendar === "demo"} onChange={() => setCalendar("demo")} className="mt-1 accent-[var(--accent)]" />
           <span>

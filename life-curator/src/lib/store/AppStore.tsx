@@ -4,6 +4,7 @@
 // user data to Supabase with row-level security. Derived data (events, fit, budget)
 // is recomputed from inputs rather than stored.
 import { createContext, useCallback, useContext, useEffect, useMemo, useReducer, useState, type ReactNode } from "react";
+import { readEmbeddedSnapshot } from "@/lib/data/calendarSnapshot";
 import { demoCalendar, DISCONNECTED_CALENDAR } from "@/lib/data/demoCalendar";
 import { expandBlocks } from "@/lib/domain/availability";
 import { summarizeMonth, type BudgetSummary } from "@/lib/domain/budget";
@@ -39,6 +40,8 @@ interface Store {
   ready: boolean;
   loadError: string | null;
   storageAvailable: boolean;
+  /** A bundled read-only copy of the user's real busy times, when this build has one. */
+  snapshot: CalendarSnapshot | null;
   derived: Derived | null;
 }
 
@@ -52,6 +55,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
   const [events, setEvents] = useState<CuratorEvent[] | null>(null);
   const [sourceRuns, setSourceRuns] = useState<SourceRunResult[]>([]);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [snapshot] = useState<CalendarSnapshot | null>(() => readEmbeddedSnapshot());
 
   // Hydrate from storage once, on the client.
   useEffect(() => {
@@ -93,7 +97,12 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
   const derived = useMemo<Derived | null>(() => {
     if (now === null || events === null) return null;
     const { prefs } = state;
-    const calendar = state.calendarMode === "demo" ? demoCalendar(now) : DISCONNECTED_CALENDAR;
+    const calendar =
+      state.calendarMode === "demo"
+        ? demoCalendar(now)
+        : state.calendarMode === "snapshot" && snapshot
+          ? snapshot
+          : DISCONNECTED_CALENDAR;
     const today = localDate(now, prefs.timezone);
     const protectedIntervals = expandBlocks(prefs.protectedBlocks, addDays(today, -1), 130, prefs.timezone);
     const eventMap = new Map(events.map((e) => [e.id, e]));
@@ -125,11 +134,11 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
       browse: rankAll(events, { ...rankContext, mode: "browse" }),
       rankContext,
     };
-  }, [now, events, sourceRuns, state]);
+  }, [now, events, sourceRuns, state, snapshot]);
 
   const value = useMemo<Store>(
-    () => ({ state, dispatch, ready: hydrated && derived !== null, loadError, storageAvailable, derived }),
-    [state, hydrated, derived, loadError, storageAvailable],
+    () => ({ state, dispatch, ready: hydrated && derived !== null, loadError, storageAvailable, snapshot, derived }),
+    [state, hydrated, derived, loadError, storageAvailable, snapshot],
   );
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }

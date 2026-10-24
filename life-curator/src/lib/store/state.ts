@@ -22,8 +22,11 @@ export const STATE_VERSION = 1;
 export interface AppState {
   version: number;
   onboarded: boolean;
-  /** "demo" uses the sample calendar; "disconnected" means no calendar at all. Live Google is Phase 3. */
-  calendarMode: "demo" | "disconnected";
+  /**
+   * "demo" uses the sample calendar; "snapshot" uses a read-only copy of the user's real
+   * busy times when one is bundled; "disconnected" means no calendar. Live Google is Phase 3.
+   */
+  calendarMode: "demo" | "snapshot" | "disconnected";
   prefs: Preferences;
   saved: Record<string, SavedEvent>;
   trips: Record<string, SavedTrip>;

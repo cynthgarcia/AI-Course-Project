@@ -154,8 +154,9 @@ export function evaluateFit(input: FitInput): FitResult {
     reasons.push("Clashes with an existing commitment once travel and buffers are included.");
     status = "conflict";
   }
-  if (!conflict && calendar.mode === "disconnected" && prefs.officeDays.includes(weekday)) {
-    // Fallback without a calendar: don't suggest starts before work could realistically end.
+  if (!conflict && prefs.officeDays.includes(weekday)) {
+    // Work hours are often not in the calendar: on office days, don't suggest anything
+    // before work could realistically end, whether or not a calendar is connected.
     const workEnd = zonedToEpoch(date, prefs.workEndTime, tz);
     if (window.start < workEnd && start > workEnd - 10 * HOUR) {
       reasons.push(`Starts before you could realistically leave work (${prefs.workEndTime} + travel).`);

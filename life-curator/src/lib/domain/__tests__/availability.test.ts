@@ -103,3 +103,11 @@ describe("calendar fit", () => {
     expect(before.status).toBe("fits");
   });
 });
+
+describe("work hours with a connected calendar", () => {
+  it("does not treat an empty office day as free before work ends", () => {
+    const fit = evaluateFit({ ...base, start: t("2026-10-27T12:30:00Z"), end: t("2026-10-27T13:30:00Z"), area: "soho", calendar: cal([]) });
+    expect(fit.status).toBe("conflict");
+    expect(fit.reasons[0]).toMatch(/leave work/);
+  });
+});

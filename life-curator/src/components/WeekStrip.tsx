@@ -36,7 +36,7 @@ export function WeekStrip() {
   return (
     <section aria-labelledby="evenings">
       <h2 id="evenings" className="mb-2 text-[11px] uppercase tracking-[0.18em] text-muted">
-        Your evenings {derived.calendar.mode === "demo" ? "(sample calendar)" : derived.calendar.mode === "disconnected" ? "(no calendar connected)" : ""}
+        Your evenings {derived.calendar.mode === "demo" ? "(sample calendar)" : derived.calendar.mode === "snapshot" ? "(your calendar, copied — not live)" : derived.calendar.mode === "disconnected" ? "(no calendar connected)" : ""}
       </h2>
       <ol className="grid grid-cols-7 gap-1.5">
         {days.map((d) => (

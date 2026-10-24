@@ -153,7 +153,8 @@ export interface CategorizedInterval extends Interval {
   label: string | null;
 }
 
-export type CalendarMode = "demo" | "live" | "disconnected";
+/** "snapshot" = a read-only copy of the user's real busy times taken at a fixed moment (not live). */
+export type CalendarMode = "demo" | "snapshot" | "live" | "disconnected";
 
 export interface CalendarSnapshot {
   mode: CalendarMode;

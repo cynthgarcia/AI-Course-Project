@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
 import { useStore } from "@/lib/store/AppStore";
+import { calendarLabel } from "@/lib/ui/calendarLabel";
 import { Onboarding } from "./Onboarding";
 
 const NAV = [
@@ -19,7 +20,7 @@ function isActive(path: string, href: string) {
 
 export function AppShell({ children }: { children: ReactNode }) {
   const path = usePathname();
-  const { ready, state, loadError, storageAvailable } = useStore();
+  const { ready, state, loadError, storageAvailable, snapshot } = useStore();
 
   return (
     <div className="mx-auto flex min-h-dvh max-w-5xl flex-col">
@@ -49,7 +50,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 
       <div className="px-4 sm:px-6">
         <p className="rounded-md border border-line bg-warn-soft px-3 py-2 text-xs text-warn" role="note">
-          <strong>Demo mode.</strong> All events are fictional samples, and {state.calendarMode === "demo" ? "the calendar is a sample calendar" : "no calendar is connected"}. Nothing here is real or bookable yet.
+          <strong>Demo mode.</strong> All events are fictional samples, and {calendarLabel(state.calendarMode, snapshot)}. Nothing here is real or bookable yet.
           {!storageAvailable && " Your browser storage is unavailable, so changes won't be kept after you leave."}
         </p>
       </div>
