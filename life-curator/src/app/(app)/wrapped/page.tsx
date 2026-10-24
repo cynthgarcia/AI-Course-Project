@@ -130,7 +130,7 @@ export default function WrappedPage() {
             </ol>
           </section>
 
-          <div className="grid gap-4 md:grid-cols-2">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             <section aria-labelledby="cats" className="rounded-xl border border-line bg-card p-4">
               <h2 id="cats" className="text-[11px] uppercase tracking-[0.18em] text-muted">
                 What you went to

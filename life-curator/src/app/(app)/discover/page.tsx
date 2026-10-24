@@ -245,7 +245,7 @@ function Discover() {
           Try widening the dates or turning off &ldquo;Only things that fit&rdquo;. Protected time is only included if you ask.
         </EmptyState>
       ) : (
-        <div className="grid gap-4 md:grid-cols-2">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           {results.map((r) => (
             <EventCard key={r.event.id} rec={r} showExclusions={!fitsOnly} />
           ))}

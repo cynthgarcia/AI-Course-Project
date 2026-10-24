@@ -108,7 +108,7 @@ export default function ThisWeekPage() {
           </div>
         )}
         {view.plan?.note && <p className="mb-3 text-sm text-muted">{view.plan.note}</p>}
-        <div className="grid gap-4 md:grid-cols-2">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           {view.plan
             ? planItems?.map(({ item, rec }) => <EventCard key={item.eventId} rec={rec!} showExclusions />)
             : view.shortlist.map((r) => <EventCard key={r.event.id} rec={r} />)}
@@ -128,7 +128,7 @@ export default function ThisWeekPage() {
           <SectionHeading id="travel" kicker="Worth a weekend away?" aside={<Link href="/discover?view=travel" className="text-sm text-accent">All travel ideas →</Link>}>
             Travel-worthy
           </SectionHeading>
-          <div className="grid gap-4 md:grid-cols-2">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             {view.travel.map((r) => (
               <EventCard key={r.event.id} rec={r} />
             ))}
