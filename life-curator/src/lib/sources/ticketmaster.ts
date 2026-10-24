@@ -101,16 +101,18 @@ export function ticketmasterAdapter(apiKey: string, cities: { city: string; coun
         { latlong: "51.5073,-0.1276", radius: "15", unit: "miles" },
         ...cities.map((c) => ({ city: c.city, countryCode: c.countryCode })),
       ];
-      const out: CuratorEvent[] = [];
-      for (const q of queries) {
+      const fetchOne = async (q: Record<string, string>) => {
         const params = new URLSearchParams({ apikey: apiKey, size: "100", sort: "date,asc", startDateTime: iso(Math.max(range.from, now)), endDateTime: iso(range.to), ...q });
         const res = await fetchImpl(`${BASE}?${params}`, { signal: AbortSignal.timeout(10_000) });
         if (!res.ok) throw new Error(`Ticketmaster responded ${res.status}`); // status only, never the key
         const body = (await res.json()) as { _embedded?: { events?: TmEvent[] } };
-        for (const e of body._embedded?.events ?? []) {
-          const ev = normalizeTicketmaster(e, fetchedAt);
-          if (ev) out.push(ev);
-        }
+        return (body._embedded?.events ?? []).map((e) => normalizeTicketmaster(e, fetchedAt)).filter((e): e is CuratorEvent => e !== null);
+      };
+      // A few at a time: well inside Ticketmaster's rate limit (5 requests/second).
+      const out: CuratorEvent[] = [];
+      for (let i = 0; i < queries.length; i += 4) {
+        const batch = await Promise.all(queries.slice(i, i + 4).map(fetchOne));
+        out.push(...batch.flat());
       }
       return out;
     },

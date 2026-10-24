@@ -30,7 +30,16 @@ async function createPglite(dataDir: string): Promise<Db> {
 
 async function createPostgres(url: string): Promise<Db> {
   const { default: postgres } = await import("postgres");
-  const sql = postgres(url, { max: 5, ssl: process.env.DATABASE_SSL === "disable" ? false : "require", onnotice: () => {} });
+  // prepare: false keeps this compatible with transaction poolers (e.g. Supabase port 6543),
+  // which serverless deployments should use.
+  const sql = postgres(url, {
+    max: 3,
+    idle_timeout: 20,
+    connect_timeout: 10,
+    prepare: false,
+    ssl: process.env.DATABASE_SSL === "disable" ? false : "require",
+    onnotice: () => {},
+  });
   type Unsafe = (t: string, p?: never[]) => Promise<unknown[]>;
   const wrap = (u: Unsafe): Queryable => ({
     async query<T>(text: string, params: unknown[] = []) {
@@ -44,17 +53,29 @@ async function createPostgres(url: string): Promise<Db> {
   };
 }
 
+const MIGRATION_LOCK = 727_274_001;
+
+/**
+ * Applies pending migrations. Safe when several server instances start at once:
+ * each migration runs under a transaction-scoped advisory lock and re-checks
+ * whether another instance already applied it.
+ */
 async function migrate(db: Db): Promise<void> {
   await db.query("create table if not exists schema_migrations (id text primary key, applied_at timestamptz not null default now())");
   const done = new Set((await db.query<{ id: string }>("select id from schema_migrations")).map((r) => r.id));
   for (const m of MIGRATIONS) {
     if (done.has(m.id)) continue;
     await db.transaction(async (q) => {
+      await q.query("select pg_advisory_xact_lock($1)", [MIGRATION_LOCK]);
+      const [already] = await q.query("select 1 from schema_migrations where id = $1", [m.id]);
+      if (already) return;
       for (const stmt of m.statements) await q.query(stmt);
       await q.query("insert into schema_migrations (id) values ($1)", [m.id]);
     });
   }
 }
+
+export class ConfigError extends Error {}
 
 const g = globalThis as unknown as { __lcDb?: Promise<Db> };
 
@@ -62,6 +83,8 @@ const g = globalThis as unknown as { __lcDb?: Promise<Db> };
 export function getDb(): Promise<Db> {
   if (!g.__lcDb) {
     g.__lcDb = (async () => {
+      // Serverless hosts have no lasting disk: an embedded database there would silently lose data.
+      if (!process.env.DATABASE_URL && process.env.VERCEL) throw new ConfigError("DATABASE_URL is not set. Add your Supabase connection string in Vercel's environment variables.");
       const db = process.env.DATABASE_URL
         ? await createPostgres(process.env.DATABASE_URL)
         : await createPglite(process.env.DATA_DIR ?? path.join(process.cwd(), ".data", "pglite"));

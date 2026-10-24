@@ -10,7 +10,8 @@ export async function POST(req: Request) {
   const parsed = credentials.safeParse(await readJson(req, 4_000));
   if (!parsed.success) return error(400, "Enter your email and password.");
   const { email, password } = parsed.data;
-  if (rateLimited(`login:${clientKey(req)}:${email}`, 8, 15 * 60_000)) return error(429, "Too many attempts. Wait a few minutes and try again.");
+  if ((await rateLimited(`login:${clientKey(req)}:${email}`, 8, 15 * 60_000)) || (await rateLimited(`login-email:${email}`, 30, 60 * 60_000)))
+    return error(429, "Too many attempts. Wait a few minutes and try again.");
 
   const db = await getDb();
   const [user] = await db.query<{ id: string; password_hash: string }>("select id, password_hash from users where email = $1", [email]);

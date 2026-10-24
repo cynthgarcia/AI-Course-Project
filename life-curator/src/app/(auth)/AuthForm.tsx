@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { btn } from "@/components/ui";
 
 export function AuthForm({ mode }: { mode: "login" | "signup" }) {
@@ -10,6 +10,15 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const signup = mode === "signup";
+  const [inviteRequired, setInviteRequired] = useState(false);
+  const [inviteCode, setInviteCode] = useState("");
+  useEffect(() => {
+    if (!signup) return;
+    fetch("/api/auth/config")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((c: { inviteRequired?: boolean } | null) => setInviteRequired(!!c?.inviteRequired))
+      .catch(() => undefined);
+  }, [signup]);
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -19,7 +28,7 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
       const res = await fetch(`/api/auth/${mode}`, {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify(signup && inviteRequired ? { email, password, inviteCode } : { email, password }),
       });
       if (!res.ok) {
         setError(((await res.json().catch(() => null)) as { error?: string } | null)?.error ?? "Something went wrong. Please try again.");
@@ -62,6 +71,13 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
           />
           {signup && <span className="mt-1 block text-xs text-muted">At least 10 characters.</span>}
         </label>
+        {signup && inviteRequired && (
+          <label className="block text-sm">
+            Invite code
+            <input id="invite" autoComplete="off" required value={inviteCode} onChange={(e) => setInviteCode(e.target.value)} className="mt-1 w-full rounded-lg border border-line bg-card px-3 py-2.5" />
+            <span className="mt-1 block text-xs text-muted">Sign-ups are invite-only for now.</span>
+          </label>
+        )}
         {error && (
           <p role="alert" className="rounded-lg bg-bad-soft px-3 py-2 text-sm text-bad">
             {error}

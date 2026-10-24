@@ -3,6 +3,7 @@ import { json } from "@/server/http";
 import { configuredSources } from "@/server/sources";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 60;
 
 /** Public event catalogue (no user data). */
 export async function GET() {

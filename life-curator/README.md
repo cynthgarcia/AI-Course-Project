@@ -16,6 +16,9 @@ No setup needed: locally the app uses an embedded Postgres (PGlite) stored in `.
 For production, set `DATABASE_URL` to any hosted Postgres (Supabase, Neon, …) — the same
 migrations run automatically on startup.
 
+## Deploy
+See **[DEPLOY.md](DEPLOY.md)** — Vercel + Supabase, about 15 minutes. Check `/api/health` afterwards.
+
 ## Architecture
 - **Frontend:** Next.js App Router pages (`src/app/(app)`, `src/app/(auth)`), React, Tailwind.
 - **Backend:** Next.js API routes in `src/app/api/*`, server code in `src/server/`:
@@ -32,12 +35,15 @@ migrations run automatically on startup.
 | `POST /api/auth/signup`, `/login`, `/logout`, `GET /api/auth/me` | Accounts and sessions |
 | `GET /api/state` | The signed-in user's data |
 | `POST /api/actions` | Apply one validated change |
-| `GET /api/events` | Event catalogue and source status |
+| `GET /api/events` | Event catalogue and source status (cached per source in the database) |
+| `GET /api/health` | Setup check: database, schema, scheduled jobs, sources (no secrets) |
+| `GET /api/cron/*` | Daily jobs (event refresh, weekly plans); require `CRON_SECRET` |
 | `POST /api/import` | Read one pasted event page into a draft (https only, public IPs only, size and time limits) |
 | `GET /api/export`, `DELETE /api/account` | Data export and account deletion |
 
 Security: same-origin checks on every state-changing request, SameSite=Lax HttpOnly cookies,
-login and signup rate limits, no payload or credential logging, cascading account deletion.
+database-backed rate limits (hashed keys), optional invite-only sign-up, no payload or credential
+logging, cascading account deletion. Changes made together are saved as one atomic batch.
 
 ## What works now
 - **This Week** — evening availability strip, budget summary, a shortlist of ≤6 calendar-compatible
@@ -83,7 +89,12 @@ login and signup rate limits, no payload or credential logging, cascading accoun
 - **Eventbrite**: `EVENTBRITE_TOKEN` + `EVENTBRITE_ORGANIZER_IDS` (comma-separated). Eventbrite has no
   public search, so it follows organisers you choose.
 - Sample events turn off automatically once a real source is set (`DEMO_EVENTS=1` keeps them).
-- Not supported, by design: DICE (no public API) and Instagram (doesn't permit reading posts) — use
+- **Calendar feeds** (`EVENT_ICS_FEEDS`): Luma calendars, Meetup groups and venue iCal feeds. Timed,
+  in-person, non-recurring events only.
+- **Venue pages** (`EVENT_PAGES`): "What's on" pages that publish schema.org event data. robots.txt is
+  checked first; disallowed pages are skipped. Only add sites whose terms allow it.
+- Not supported, by design: DICE (no public API), Instagram (doesn't permit reading posts), and Google's
+  event listings (no official API; third-party resellers are paid and often lack exact times). Use
   "Add from a link" or "Add by hand". No scraping.
 - Scheduler (e.g. Vercel Cron / Supabase scheduled functions) and any notification channel (Phase 6).
 

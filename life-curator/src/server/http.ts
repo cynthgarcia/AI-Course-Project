@@ -1,5 +1,6 @@
 // Shared request/response helpers for API routes.
 import { SESSION_COOKIE, SESSION_DAYS, userForToken, type SessionUser } from "./auth";
+import { createHash, timingSafeEqual } from "node:crypto";
 import { getDb } from "./db";
 
 export function json(data: unknown, status = 200, headers: Record<string, string> = {}): Response {
@@ -56,20 +57,34 @@ export async function currentUser(req: Request): Promise<SessionUser | null> {
   return userForToken(db, readCookie(req, SESSION_COOKIE));
 }
 
-const buckets = new Map<string, { count: number; resetAt: number }>();
-
-/** Simple fixed-window limiter (per server instance). */
-export function rateLimited(key: string, limit: number, windowMs: number): boolean {
-  const now = Date.now();
-  const b = buckets.get(key);
-  if (!b || b.resetAt < now) {
-    buckets.set(key, { count: 1, resetAt: now + windowMs });
-    return false;
-  }
-  b.count++;
-  return b.count > limit;
+/**
+ * Fixed-window rate limit stored in the database, so it holds across server instances.
+ * Keys are hashed: no emails or IP addresses are stored.
+ */
+export async function rateLimited(key: string, limit: number, windowMs: number): Promise<boolean> {
+  const db = await getDb();
+  const hashed = createHash("sha256").update(key).digest("hex");
+  const [row] = await db.query<{ count: number }>(
+    `insert into rate_limits (key, count, reset_at) values ($1, 1, now() + ($2::int * interval '1 millisecond'))
+     on conflict (key) do update set
+       count = case when rate_limits.reset_at < now() then 1 else rate_limits.count + 1 end,
+       reset_at = case when rate_limits.reset_at < now() then excluded.reset_at else rate_limits.reset_at end
+     returning count`,
+    [hashed, windowMs],
+  );
+  if (Math.random() < 0.02) await db.query("delete from rate_limits where reset_at < now() - interval '1 day'");
+  return (row?.count ?? 0) > limit;
 }
 
 export function clientKey(req: Request): string {
   return (req.headers.get("x-forwarded-for") ?? "local").split(",")[0]!.trim();
+}
+
+/** Scheduled jobs: Vercel Cron sends "Authorization: Bearer $CRON_SECRET". */
+export function cronAuthorized(req: Request): boolean {
+  const secret = process.env.CRON_SECRET;
+  if (!secret || secret.length < 16) return false;
+  const given = Buffer.from(req.headers.get("authorization") ?? "");
+  const expected = Buffer.from(`Bearer ${secret}`);
+  return given.length === expected.length && timingSafeEqual(given, expected);
 }

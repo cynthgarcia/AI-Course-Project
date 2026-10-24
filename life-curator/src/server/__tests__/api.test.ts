@@ -215,3 +215,37 @@ describe("custom events and hobbies", () => {
     expect(s.hobbies[id]).toMatchObject({ status: "trying", rating: 5, nextSession: "2026-11-07", pastExperience: true });
   });
 });
+
+describe("batches and invites", () => {
+  it("applies a batch atomically: one bad action saves nothing", async () => {
+    const c = await account("pip@example.com");
+    const res = await act(req("POST", { actions: [{ type: "addExperience", experience: experience() }, { type: "setStatus", eventId: "demo-mahler", category: "music", status: "attended", at }] }, c));
+    expect(res.status).toBe(409);
+    const s = (await (await getState(req("GET", undefined, c))).json()).state;
+    expect(s.experiences).toEqual({});
+    const ok = await act(req("POST", { actions: [{ type: "setPrefs", prefs: { monthlyBudget: 500 } }, { type: "completeOnboarding" }] }, c));
+    const s2 = (await ok.json()).state;
+    expect(s2.onboarded).toBe(true);
+    expect(s2.prefs.monthlyBudget).toBe(500);
+  });
+
+  it("new accounts start with a neutral profile", async () => {
+    const c = await account("quinn@example.com");
+    const s = (await (await getState(req("GET", undefined, c))).json()).state;
+    expect(s.prefs.officeDays).toEqual([]);
+    expect(s.prefs.protectedBlocks).toEqual([]);
+    expect(s.prefs.homeNeighborhood).toBe("");
+    expect(s.onboarded).toBe(false);
+  });
+
+  it("requires the invite code when one is set", async () => {
+    process.env.SIGNUP_INVITE_CODE = "curate-2026";
+    try {
+      expect((await signup(req("POST", { email: "rae@example.com", password: "correct horse battery" }))).status).toBe(403);
+      expect((await signup(req("POST", { email: "rae@example.com", password: "correct horse battery", inviteCode: "nope" }))).status).toBe(403);
+      expect((await signup(req("POST", { email: "rae@example.com", password: "correct horse battery", inviteCode: "curate-2026" }))).status).toBe(201);
+    } finally {
+      delete process.env.SIGNUP_INVITE_CODE;
+    }
+  });
+});

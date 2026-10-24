@@ -8,7 +8,7 @@ export async function POST(req: Request) {
   if (!sameOrigin(req)) return error(403, "Cross-site request refused.");
   const user = await currentUser(req);
   if (!user) return error(401, "Not signed in.");
-  if (rateLimited(`import:${user.id}`, 30, 60 * 60_000)) return error(429, "That's a lot of imports — try again in a while.");
+  if (await rateLimited(`import:${user.id}`, 30, 60 * 60_000)) return error(429, "That's a lot of imports — try again in a while.");
   const body = await readJson<{ url?: unknown }>(req, 4_000);
   if (!body || typeof body.url !== "string" || body.url.length > 2000) return error(400, "Paste a link to an event page.");
   try {

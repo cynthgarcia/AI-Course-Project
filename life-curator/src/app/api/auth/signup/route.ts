@@ -1,3 +1,4 @@
+import { timingSafeEqual } from "node:crypto";
 import { createSession, hashPassword, MIN_PASSWORD } from "@/server/auth";
 import { getDb } from "@/server/db";
 import { clientKey, error, json, rateLimited, readJson, sameOrigin, sessionCookie } from "@/server/http";
@@ -8,8 +9,16 @@ export const dynamic = "force-dynamic";
 
 export async function POST(req: Request) {
   if (!sameOrigin(req)) return error(403, "Cross-site request refused.");
-  if (rateLimited(`signup:${clientKey(req)}`, Number(process.env.SIGNUP_RATE_LIMIT ?? 10), 60 * 60_000)) return error(429, "Too many sign-ups from here. Try again later.");
-  const parsed = credentials.safeParse(await readJson(req, 4_000));
+  if (await rateLimited(`signup:${clientKey(req)}`, Number(process.env.SIGNUP_RATE_LIMIT ?? 10), 60 * 60_000)) return error(429, "Too many sign-ups from here. Try again later.");
+  const raw = await readJson<Record<string, unknown>>(req, 4_000);
+  // Private beta: when SIGNUP_INVITE_CODE is set, only people with the code can join.
+  const code = process.env.SIGNUP_INVITE_CODE;
+  if (code) {
+    const given = Buffer.from(typeof raw?.inviteCode === "string" ? raw.inviteCode.trim() : "");
+    const expected = Buffer.from(code);
+    if (given.length !== expected.length || !timingSafeEqual(given, expected)) return error(403, "That invite code isn't right. Ask whoever invited you for the code.");
+  }
+  const parsed = credentials.safeParse(raw);
   if (!parsed.success) return error(400, "Enter a valid email and password.");
   const { email, password } = parsed.data;
   if (password.length < MIN_PASSWORD) return error(400, `Use at least ${MIN_PASSWORD} characters for your password.`);

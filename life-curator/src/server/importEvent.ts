@@ -2,6 +2,7 @@
 // that many event sites publish for search engines. User-initiated, single page, no crawling.
 // Guards against server-side request forgery: https only, public IPs only (checked on
 // every redirect), short timeout and size cap.
+import { createHash } from "node:crypto";
 import { lookup } from "node:dns/promises";
 import { isIP } from "node:net";
 import { classify, inferTags } from "@/lib/sources/classify";
@@ -45,13 +46,23 @@ export async function assertPublicUrl(raw: string, resolve: typeof lookup = look
 
 const MAX_BYTES = 1_500_000;
 
-export async function fetchPage(raw: string, fetchImpl: typeof fetch = fetch, resolve: typeof lookup = lookup): Promise<{ url: string; html: string }> {
+export interface FetchTextOptions {
+  accept?: RegExp;
+  fetchImpl?: typeof fetch;
+  resolve?: typeof lookup;
+  /** Sent as the Accept header. */
+  acceptHeader?: string;
+}
+
+/** Fetches one public https resource with SSRF protection on every redirect hop. */
+export async function fetchText(raw: string, opts: FetchTextOptions = {}): Promise<{ url: string; text: string; status: number }> {
+  const { accept = /html/i, fetchImpl = fetch, resolve = lookup, acceptHeader = "text/html,application/xhtml+xml" } = opts;
   let url = await assertPublicUrl(raw, resolve);
   for (let hop = 0; hop < 4; hop++) {
     const res = await fetchImpl(url, {
       redirect: "manual",
       signal: AbortSignal.timeout(8_000),
-      headers: { accept: "text/html,application/xhtml+xml", "user-agent": "YourLifeCurator/1.0 (single page, user-requested)" },
+      headers: { accept: acceptHeader, "user-agent": "YourLifeCurator/1.0 (+event discovery; respects robots.txt)" },
     }).catch(() => {
       throw new ImportError("That page couldn't be reached.");
     });
@@ -59,10 +70,10 @@ export async function fetchPage(raw: string, fetchImpl: typeof fetch = fetch, re
       url = await assertPublicUrl(new URL(res.headers.get("location")!, url).toString(), resolve);
       continue;
     }
-    if (!res.ok) throw new ImportError(`That page returned an error (${res.status}).`);
-    if (!/html/i.test(res.headers.get("content-type") ?? "")) throw new ImportError("That link isn't a web page.");
+    if (!res.ok) return { url: url.toString(), text: "", status: res.status };
+    if (!accept.test(res.headers.get("content-type") ?? "")) throw new ImportError("That link isn't the expected kind of page.");
     const reader = res.body?.getReader();
-    if (!reader) throw new ImportError("That page was empty.");
+    if (!reader) return { url: url.toString(), text: "", status: res.status };
     const chunks: Uint8Array[] = [];
     let size = 0;
     for (;;) {
@@ -75,9 +86,16 @@ export async function fetchPage(raw: string, fetchImpl: typeof fetch = fetch, re
       }
       chunks.push(value);
     }
-    return { url: url.toString(), html: new TextDecoder().decode(Buffer.concat(chunks)) };
+    return { url: url.toString(), text: new TextDecoder().decode(Buffer.concat(chunks)), status: res.status };
   }
   throw new ImportError("That link redirected too many times.");
+}
+
+export async function fetchPage(raw: string, fetchImpl: typeof fetch = fetch, resolve: typeof lookup = lookup): Promise<{ url: string; html: string }> {
+  const res = await fetchText(raw, { fetchImpl, resolve });
+  if (res.status >= 400) throw new ImportError(`That page returned an error (${res.status}).`);
+  if (!res.text) throw new ImportError("That page was empty.");
+  return { url: res.url, html: res.text };
 }
 
 type Json = Record<string, unknown>;
@@ -94,27 +112,38 @@ function* walk(node: unknown): Generator<Json> {
 const isEventType = (t: unknown) => (Array.isArray(t) ? t : [t]).some((x) => typeof x === "string" && /Event$/.test(x));
 const str = (v: unknown) => (typeof v === "string" ? v : null);
 
-/** Builds a draft event from the page's structured data; the user reviews it before saving. */
-export function parseEventPage(html: string, pageUrl: string, now = Date.now()): CuratorEvent {
-  const blocks = [...html.matchAll(/<script[^>]*type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi)].map((m) => m[1] ?? "");
-  let ev: Json | null = null;
-  for (const b of blocks) {
+function jsonLdEvents(html: string): Json[] {
+  const out: Json[] = [];
+  for (const m of html.matchAll(/<script[^>]*type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi)) {
     try {
-      for (const node of walk(JSON.parse(b.trim()))) if (isEventType(node["@type"])) { ev = node; break; }
+      for (const node of walk(JSON.parse((m[1] ?? "").trim()))) if (isEventType(node["@type"])) out.push(node);
     } catch {
       // ignore malformed blocks
     }
-    if (ev) break;
   }
-  if (!ev) throw new ImportError("This page doesn't publish event details in a way apps can read. Add it by hand instead.");
+  return out;
+}
 
+export interface PageEventOptions {
+  now?: number;
+  /** "draft" = user import (unverified, private); "source" = a configured publisher page. */
+  mode?: "draft" | "source";
+  sourceId?: string;
+}
+
+/** Converts one schema.org Event node; null when it lacks a name or start time. */
+export function eventFromJsonLd(ev: Json, pageUrl: string, opts: PageEventOptions = {}): CuratorEvent | null {
+  const now = opts.now ?? Date.now();
+  const mode = opts.mode ?? "draft";
   const name = plainText(str(ev.name), 200);
   const start = str(ev.startDate);
-  if (!name || !start || Number.isNaN(Date.parse(start))) throw new ImportError("The page is missing the event's name or start time. Add it by hand instead.");
+  // Date-only start times can't be scheduled honestly.
+  if (!name || !start || !/T\d{2}:\d{2}/.test(start) || Number.isNaN(Date.parse(start))) return null;
+  if (/Cancelled|Postponed/i.test(str(ev.eventStatus) ?? "")) return null;
   const loc = (Array.isArray(ev.location) ? ev.location[0] : ev.location) as Json | undefined;
   const addr = (loc?.address ?? {}) as Json | string;
   const address = typeof addr === "string" ? addr : [str(addr.streetAddress), str(addr.addressLocality), str(addr.postalCode)].filter(Boolean).join(", ") || null;
-  const city = typeof addr === "string" ? null : str(addr.addressLocality);
+  const city = typeof addr === "string" ? (/london/i.test(addr) ? "London" : null) : str(addr.addressLocality);
   const geo = (loc?.geo ?? {}) as Json;
   const lat = geo.latitude !== undefined ? Number(geo.latitude) : null;
   const lon = geo.longitude !== undefined ? Number(geo.longitude) : null;
@@ -125,12 +154,14 @@ export function parseEventPage(html: string, pageUrl: string, now = Date.now()):
   const currency = offers.map((o) => str(o.priceCurrency)).find(Boolean) ?? "GBP";
   const description = plainText(str(ev.description));
   const host = new URL(pageUrl).hostname.replace(/^www\./, "");
-  const official = safeUrl(str(ev.url) ?? pageUrl) ?? pageUrl;
+  const official = safeUrl(str(ev.url) ? new URL(str(ev.url)!, pageUrl).toString() : pageUrl) ?? pageUrl;
   const organizer = ev.organizer && typeof ev.organizer === "object" ? str((ev.organizer as Json).name) : null;
   const text = `${name} ${description}`;
   const startIso = new Date(start).toISOString();
+  const endRaw = str(ev.endDate);
+  const id = mode === "draft" ? `user-${crypto.randomUUID()}` : `${opts.sourceId ?? "page"}-${createHash("sha1").update(`${official}|${startIso}|${name}`).digest("hex").slice(0, 16)}`;
   return {
-    id: `user-${crypto.randomUUID()}`,
+    id,
     title: name,
     description,
     category: classify(text),
@@ -144,25 +175,44 @@ export function parseEventPage(html: string, pageUrl: string, now = Date.now()):
       area: where.area,
     },
     start: startIso,
-    end: str(ev.endDate) && !Number.isNaN(Date.parse(str(ev.endDate)!)) ? new Date(str(ev.endDate)!).toISOString() : null,
+    end: endRaw && /T\d{2}:\d{2}/.test(endRaw) && !Number.isNaN(Date.parse(endRaw)) ? new Date(endRaw).toISOString() : null,
     // schema.org dates carry an offset, so the instant is exact; display uses the destination's zone when known.
     timezone: getDestination(where.destinationId)?.timezone ?? "Europe/London",
     price: prices.length ? price(Math.min(...prices), highs.length ? Math.max(...highs) : null, currency, Math.max(...prices) === 0) : price(null, null, currency),
     officialUrl: official,
     bookingUrl: safeUrl(str(offers[0]?.url)) ?? official,
     organizer,
-    eligibility: "unknown",
+    eligibility: mode === "draft" ? "unknown" : "public",
     dressCode: null,
     accessibility: null,
-    verification: { status: "unverified", lastVerifiedAt: new Date(now).toISOString(), sourceName: `Imported from ${host}` },
+    verification:
+      mode === "draft"
+        ? { status: "unverified", lastVerifiedAt: new Date(now).toISOString(), sourceName: `Imported from ${host}` }
+        : { status: "verified", lastVerifiedAt: new Date(now).toISOString(), sourceName: host },
     isDemo: false,
     socialFit: null,
     bookingDeadline: null,
     advancePlanning: false,
     destinationId: where.destinationId,
     occurrenceGroupId: null,
-    sourceRecords: [{ sourceId: "user-import", externalId: null, url: official, lastSeenAt: new Date(now).toISOString() }],
+    sourceRecords: [{ sourceId: mode === "draft" ? "user-import" : opts.sourceId ?? "page", externalId: null, url: official, lastSeenAt: new Date(now).toISOString() }],
     accessNote: null,
-    addedByUser: true,
+    addedByUser: mode === "draft",
   };
+}
+
+/** Every timed event on a page (used by configured venue pages). */
+export function eventsFromPage(html: string, pageUrl: string, opts: PageEventOptions = {}): CuratorEvent[] {
+  return jsonLdEvents(html)
+    .map((n) => eventFromJsonLd(n, pageUrl, opts))
+    .filter((e): e is CuratorEvent => e !== null);
+}
+
+/** Builds a draft event from the page's structured data; the user reviews it before saving. */
+export function parseEventPage(html: string, pageUrl: string, now = Date.now()): CuratorEvent {
+  const nodes = jsonLdEvents(html);
+  if (!nodes.length) throw new ImportError("This page doesn't publish event details in a way apps can read. Add it by hand instead.");
+  const ev = nodes.map((n) => eventFromJsonLd(n, pageUrl, { now })).find((e): e is CuratorEvent => e !== null);
+  if (!ev) throw new ImportError("The page is missing the event's name or start time. Add it by hand instead.");
+  return ev;
 }

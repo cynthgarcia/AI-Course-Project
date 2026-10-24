@@ -79,8 +79,10 @@ interface Store {
 
 const Ctx = createContext<Store | null>(null);
 
-async function postAction(action: unknown): Promise<AppState> {
-  const res = await fetch("/api/actions", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(action) });
+async function postActions(actions: unknown[]): Promise<AppState> {
+  // keepalive lets the save finish even if the user navigates away straight after.
+  const payload = JSON.stringify(actions.length === 1 ? actions[0] : { actions });
+  const res = await fetch("/api/actions", { method: "POST", headers: { "content-type": "application/json" }, body: payload, keepalive: payload.length < 60_000 });
   if (res.status === 401) {
     window.location.assign("/login");
     throw new Error("Signed out");
@@ -95,8 +97,8 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
   const [mode] = useState<StoreMode>(() => (typeof window !== "undefined" && window.__LC_STATIC__ ? "local" : "server"));
   const [email, setEmail] = useState<string | null>(null);
   const [syncError, setSyncError] = useState<string | null>(null);
-  const queue = useRef<Promise<unknown>>(Promise.resolve());
-  const pending = useRef(0);
+  const outbox = useRef<Action[]>([]);
+  const inFlight = useRef<Promise<void> | null>(null);
   const [hydrated, setHydrated] = useState(false);
   const [storageAvailable, setStorageAvailable] = useState(true);
   const [now, setNow] = useState<number | null>(null);
@@ -146,28 +148,50 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
     return () => window.clearInterval(id);
   }, [mode, reloadFromServer]);
 
+  // Changes made together (same tick) are sent together, in order, as one request.
+  const flush = useCallback((): Promise<void> => {
+    if (inFlight.current) return inFlight.current;
+    const run = (async () => {
+      while (outbox.current.length) {
+        const batch = outbox.current.splice(0, 50);
+        try {
+          const serverState = await postActions(batch);
+          // Only adopt the server's copy once no newer local changes are waiting.
+          if (!outbox.current.length) localDispatch({ type: "hydrate", state: serverState });
+          setSyncError(null);
+        } catch (e) {
+          outbox.current = [];
+          setSyncError((e as Error).message);
+          await reloadFromServer().catch(() => undefined);
+        }
+      }
+    })().finally(() => {
+      inFlight.current = null;
+    });
+    inFlight.current = run;
+    return run;
+  }, [reloadFromServer]);
+
   const dispatch = useCallback(
     (action: Action) => {
       localDispatch(action);
       if (mode !== "server" || action.type === "hydrate" || action.type === "reset") return;
-      pending.current++;
-      queue.current = queue.current
-        .then(() => postAction(action))
-        .then((serverState) => {
-          // Only adopt the server's copy once no newer local changes are waiting.
-          if (pending.current === 1) localDispatch({ type: "hydrate", state: serverState });
-          setSyncError(null);
-        })
-        .catch((e: Error) => {
-          setSyncError(e.message);
-          return reloadFromServer().catch(() => undefined);
-        })
-        .finally(() => {
-          pending.current--;
-        });
+      const first = outbox.current.length === 0 && !inFlight.current;
+      outbox.current.push(action);
+      if (first) queueMicrotask(() => void flush());
     },
-    [mode, reloadFromServer],
+    [mode, flush],
   );
+
+  // Warn before closing the tab while changes are still being saved.
+  useEffect(() => {
+    if (mode !== "server") return;
+    const onUnload = (e: BeforeUnloadEvent) => {
+      if (outbox.current.length || inFlight.current) e.preventDefault();
+    };
+    window.addEventListener("beforeunload", onUnload);
+    return () => window.removeEventListener("beforeunload", onUnload);
+  }, [mode]);
 
   useEffect(() => {
     if (!hydrated || mode !== "local") return;
@@ -195,7 +219,8 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
         if ("sources" in rest && Array.isArray(rest.sources)) setSources(rest.sources);
         setEvents(events);
         setSourceRuns(runs);
-        setLoadError(runs.every((r) => !r.ok) ? "No event sources could be loaded." : null);
+        // Only an error when every source actually failed (not when one is still loading).
+        setLoadError(runs.length > 0 && events.length === 0 && runs.every((r) => !r.ok && r.error) ? "No event sources could be loaded." : null);
       })
       .catch(() => setLoadError("Events could not be loaded."));
   }, [loadHour, mode]);
@@ -248,9 +273,10 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
   const generatePlan = useCallback(async () => {
     if (mode === "server") {
       try {
-        const next = await (queue.current = queue.current.then(() => postAction({ type: "generatePlan" })));
-        localDispatch({ type: "hydrate", state: next as AppState });
-        const run = (next as AppState).runs[0];
+        await flush();
+        const next = await postActions([{ type: "generatePlan" }]);
+        localDispatch({ type: "hydrate", state: next });
+        const run = next.runs[0];
         return { ok: run?.outcome === "generated", count: run?.itemCount ?? 0 };
       } catch (e) {
         setSyncError((e as Error).message);
@@ -267,7 +293,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
       localDispatch({ type: "recordFailedRun", run: { at, weekStart: localDate(Date.now(), state.prefs.timezone), trigger: "manual", outcome: "failed", itemCount: 0, error: "Plan generation failed." } });
       return { ok: false, count: 0 };
     }
-  }, [mode, derived, state.prefs.timezone]);
+  }, [mode, derived, state.prefs.timezone, flush]);
 
   const value = useMemo<Store>(
     () => ({ mode, state, dispatch, generatePlan, email, syncError, ready: hydrated && derived !== null, loadError, storageAvailable, snapshot, sources, derived }),

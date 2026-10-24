@@ -87,4 +87,24 @@ export const MIGRATIONS: { id: string; statements: string[] }[] = [
       )`,
     ],
   },
+  {
+    id: "0003_shared_state",
+    statements: [
+      // Per-source event results, shared by all server instances.
+      `create table event_cache (
+        source_id text primary key,
+        events jsonb not null default '[]'::jsonb,
+        fetched_at timestamptz,
+        last_attempt_at timestamptz,
+        last_error text
+      )`,
+      // Rate limiting that works across serverless instances.
+      `create table rate_limits (
+        key text primary key,
+        count integer not null,
+        reset_at timestamptz not null
+      )`,
+      `create index sessions_expires_idx on sessions (expires_at)`,
+    ],
+  },
 ];

@@ -10,9 +10,21 @@ async function signUp(page: Page): Promise<string> {
   return email;
 }
 
+async function completeWelcome(page: Page) {
+  await page.locator("#ob-home-area").selectOption("fulham");
+  await page.locator("label", { hasText: /^Yes$/ }).click();
+  for (const d of ["Tue", "Wed", "Thu"]) await page.locator("label", { hasText: new RegExp(`^${d}$`) }).click();
+  await page.getByRole("button", { name: "Next" }).click();
+  await page.getByRole("radiogroup", { name: "Music & live performance" }).getByText("Love it").click();
+  await page.getByRole("button", { name: "Next" }).click();
+  await page.getByRole("button", { name: "Next" }).click();
+  await page.getByLabel("Keep Friday evenings free for friends").check();
+  await page.getByRole("button", { name: /show me what/i }).click();
+}
+
 async function onboard(page: Page) {
   await signUp(page);
-  await page.getByRole("button", { name: /show me what/i }).click();
+  await completeWelcome(page);
   await expect(page.getByRole("heading", { name: /worth doing soon/i })).toBeVisible();
 }
 
@@ -137,7 +149,7 @@ test("signed-out visitors are sent to sign in, and accounts are separate", async
 
   const other = await browser.newPage();
   await signUp(other);
-  await other.getByRole("button", { name: /show me what/i }).click();
+  await completeWelcome(other);
   await other.goto("/my-life");
   await other.getByRole("tab", { name: /^Saved/ }).click();
   await expect(other.getByText("AI Product Builders Meetup")).toHaveCount(0);
@@ -227,4 +239,13 @@ test("add an invitation-only gala by hand with a plan to get in", async ({ page 
 
   await page.goto("/discover");
   await expect(page.getByRole("heading", { name: "Added by you" })).toBeVisible();
+});
+
+test("new accounts start neutral and the welcome flow sets the profile", async ({ page }) => {
+  await signUp(page);
+  await expect(page.getByText("Welcome · step 1 of 4")).toBeVisible();
+  await completeWelcome(page);
+  await page.goto("/settings");
+  await expect(page.locator("label", { hasText: /^Tue$/ }).first()).toHaveClass(/bg-ink/);
+  await expect(page.getByText("Friday — keep free for friends").or(page.locator('input[value="Friday — keep free for friends"]'))).toHaveCount(1);
 });

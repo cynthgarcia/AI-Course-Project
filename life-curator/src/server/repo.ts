@@ -1,5 +1,5 @@
 // Maps the app state to database rows. Every query is scoped to one user_id.
-import { DEFAULT_PREFERENCES } from "@/lib/data/defaults";
+import { DEFAULT_PREFERENCES, NEW_ACCOUNT_PREFERENCES } from "@/lib/data/defaults";
 import type { UserHobby } from "@/lib/domain/hobbies";
 import type { CuratorEvent, Experience, SavedEvent, SavedTrip } from "@/lib/domain/types";
 import { INITIAL_STATE, STATE_VERSION, type AppState } from "@/lib/store/state";
@@ -37,7 +37,7 @@ interface ExperienceRow {
 const iso = (d: Date | string) => (d instanceof Date ? d.toISOString() : new Date(d).toISOString());
 
 export async function createProfile(q: Queryable, userId: string): Promise<void> {
-  await q.query("insert into profiles (user_id, prefs) values ($1, $2::jsonb)", [userId, JSON.stringify(DEFAULT_PREFERENCES)]);
+  await q.query("insert into profiles (user_id, prefs) values ($1, $2::jsonb)", [userId, JSON.stringify(NEW_ACCOUNT_PREFERENCES)]);
 }
 
 /** Loads a user's state; `lock` serialises concurrent writes for the same user. */

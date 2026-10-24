@@ -1,4 +1,5 @@
-// Default preferences from the user profile (USER_PROFILE.md). All editable in Settings.
+// DEFAULT_PREFERENCES: the original user's profile (USER_PROFILE.md), used by previews and tests.
+// NEW_ACCOUNT_PREFERENCES: neutral starting point for anyone signing up; onboarding fills it in.
 import type { Preferences, TimeBlock } from "@/lib/domain/types";
 
 export const DEFAULT_PROTECTED_BLOCKS: TimeBlock[] = [
@@ -58,4 +59,33 @@ export const DEFAULT_PREFERENCES: Preferences = {
   goals: [],
   weeklyFunIntention: true,
   monthlyNewIntention: true,
+};
+
+export const NEW_ACCOUNT_PREFERENCES: Preferences = {
+  ...DEFAULT_PREFERENCES,
+  homeNeighborhood: "",
+  homeArea: "west_end",
+  officeNeighborhood: "",
+  officeArea: "soho",
+  officeDays: [],
+  monthlyBudget: 300,
+  interests: {
+    music: 1,
+    theatre: 1,
+    art: 1,
+    film: 1,
+    sports: 1,
+    literature: 1,
+    tech: 1,
+    investing: 1,
+    social: 1,
+    creative: 1,
+    wellness: 1,
+    faith: 1,
+    food: 1,
+    other: 1,
+  },
+  interestKeywords: [],
+  protectedBlocks: [],
+  goals: [],
 };
