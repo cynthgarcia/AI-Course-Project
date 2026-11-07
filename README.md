@@ -7,6 +7,10 @@ This repository contains the AI Course Project, including the **Weekly Investmen
 - **Workflow definition:** `outputs/weekly-investment-brief-definition.md`  
 - **Pipeline:** `pipeline/` — run with `python pipeline/run_brief.py` (see `pipeline/README.md` for setup and scheduling).
 
+## Off Hours
+
+- **App:** `life-curator/` — Off Hours ("A life beyond the calendar."), a Next.js personal concierge for experiences, culture, friends and European travel. See `life-curator/README.md` and `life-curator/DEPLOY.md`.
+
 ## Getting Started
 
 This project is connected to GitHub and ready for development in Cursor.
