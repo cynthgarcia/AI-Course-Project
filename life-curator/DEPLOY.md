@@ -1,4 +1,4 @@
-# Deploying Your Life Curator (Vercel + Supabase)
+# Deploying Off Hours (Vercel + Supabase)
 
 About 15 minutes. Your secrets go straight into Vercel; nobody else needs to see them.
 
@@ -22,6 +22,10 @@ About 15 minutes. Your secrets go straight into Vercel; nobody else needs to see
    | `SIGNUP_INVITE_CODE` | a code you share with friends | Recommended while it's private |
    | `TICKETMASTER_API_KEY` | free key from developer.ticketmaster.com | Recommended — concerts, West End, Europe |
    | `ANTHROPIC_API_KEY` + `SCOUT_ENABLED=1` | key from console.anthropic.com | Optional — the AI scout (small cost per run, see below) |
+   | `APP_URL` | your live address, e.g. `https://offhours.vercel.app` | For Google Calendar + notifications |
+   | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | from Google Cloud (section 4) | For "Connect Google Calendar" |
+   | `TOKEN_ENCRYPTION_KEY` | another random string of 32+ characters | For "Connect Google Calendar" (encrypts stored access) |
+   | `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY` | run `npx web-push generate-vapid-keys` once | For phone notifications |
    | `EVENT_ICS_FEEDS` | `Name|https://…ics` entries, one per line | Optional extras |
    | `EVENT_PAGES` | `Name|https://…` venue "What's on" pages | Optional extras |
    | `EVENTBRITE_TOKEN`, `EVENTBRITE_ORGANIZER_IDS` | private token + organiser IDs | Optional |
@@ -44,11 +48,32 @@ Open `https://<your-app>.vercel.app/api/health`. You should see:
 
 Then go to `/signup`, create your account (with the invite code if you set one) and finish the welcome steps.
 
+## 4. Google Calendar sign-in (one-time, ~10 minutes)
+1. In [Google Cloud Console](https://console.cloud.google.com/), create a project (e.g. "Off Hours").
+2. **APIs & Services → Library**: enable **Google Calendar API**.
+3. **OAuth consent screen**: User type **External**; app name **Off Hours**; add your email as a
+   **test user**; add the scope `https://www.googleapis.com/auth/calendar.freebusy` ("See the availability
+   on Google Calendars"). Leave the app in **Testing** while it's just you and friends (up to 100 test users;
+   add each person's Google email). Opening it to everyone requires Google's verification review.
+4. **Credentials → Create credentials → OAuth client ID**, type **Web application**. Authorised redirect URI:
+   `https://<your-app>.vercel.app/api/calendar/google/callback` (must match `APP_URL` exactly).
+5. Copy the client ID and secret into Vercel (`GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`), add
+   `TOKEN_ENCRYPTION_KEY` and `APP_URL`, then redeploy. "Connect Google Calendar" appears in Settings and the welcome steps.
+
+While the Google app is in Testing, Google may ask people to reconnect about once a week; Off Hours shows a
+"Reconnect" banner when that happens.
+
+## 5. Phone notifications
+1. On your computer, in the `life-curator` folder: `npx web-push generate-vapid-keys`.
+2. Put the two keys in Vercel as `VAPID_PUBLIC_KEY` and `VAPID_PRIVATE_KEY`, and redeploy.
+3. In the app: **Alerts → Turn on notifications on this device**. On iPhone, first add Off Hours to your
+   home screen (Share → Add to Home Screen) and open it from there — iOS only allows notifications that way.
+
 ## Scheduled jobs (set up automatically by `vercel.json`)
 | Job | When (UTC) | What it does |
 |---|---|---|
 | `/api/cron/refresh-events` | daily 05:17 | Refreshes every event source. Sources also refresh on demand when older than 3 hours. |
-| `/api/cron/weekly-plans` | daily 14:07 | For people whose digest day is today, prepares this week's plan once. Nothing is sent. |
+| `/api/cron/daily` | daily 14:07 | Prepares this week's plan for people whose digest day is today, then sends alerts (followed artists/venues and very strong matches) — at most a few per person, in the afternoon. |
 
 Vercel's free (Hobby) plan allows daily jobs, which is why both run once a day.
 

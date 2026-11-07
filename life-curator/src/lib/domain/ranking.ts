@@ -63,6 +63,8 @@ export interface Recommendation {
   whyItFits: string[];
   isNew: boolean;
   newReason: string | null;
+  /** The user's interest keywords this event mentions. */
+  matchedKeywords: string[];
   /** Reasons the event is excluded from calendar-compatible recommendations (empty = eligible). */
   exclusions: string[];
 }
@@ -221,6 +223,7 @@ export function scoreEvent(e: CuratorEvent, ctx: RankContext, events: Map<string
     whyItFits: [...(taste.reason ? [taste.reason] : []), ...explain(e, prefs, interest.matched, trip)],
     isNew,
     newReason,
+    matchedKeywords: interest.matched,
     exclusions,
   };
 }

@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
 import { useStore } from "@/lib/store/AppStore";
 import { calendarLabel } from "@/lib/ui/calendarLabel";
+import { AlertsBell } from "./AlertsBell";
 import { Onboarding } from "./Onboarding";
 
 const NAV = [
@@ -22,7 +23,8 @@ function isActive(path: string, href: string) {
 
 export function AppShell({ children }: { children: ReactNode }) {
   const path = usePathname();
-  const { ready, state, loadError, storageAvailable, snapshot, mode, syncError } = useStore();
+  const { ready, state, loadError, storageAvailable, snapshot, mode, syncError, derived, calendarIssue } = useStore();
+  const showingSamples = !derived || derived.events.some((e) => e.isDemo);
 
   return (
     <div className="mx-auto flex min-h-dvh max-w-5xl flex-col">
@@ -31,17 +33,20 @@ export function AppShell({ children }: { children: ReactNode }) {
       </a>
       <header className="flex items-center justify-between gap-4 px-4 pb-2 pt-5 sm:px-6">
         <Link href="/" className="font-serif text-xl tracking-tight sm:text-2xl">
-          Your Life <span className="italic text-accent">Curator</span>
+          Off <span className="italic text-accent">Hours</span>
         </Link>
-        <Link
-          href="/settings"
-          aria-label="Settings"
-          aria-current={isActive(path, "/settings") ? "page" : undefined}
-          className={`rounded-full px-2 py-1 text-lg sm:hidden ${isActive(path, "/settings") ? "text-accent" : "text-muted"}`}
-        >
-          ⚙︎
-        </Link>
-        <nav aria-label="Main" className="hidden sm:block">
+        <div className="flex items-center gap-1 sm:order-last">
+          <AlertsBell />
+          <Link
+            href="/settings"
+            aria-label="Settings"
+            aria-current={isActive(path, "/settings") ? "page" : undefined}
+            className={`rounded-full px-2 py-1 text-lg sm:hidden ${isActive(path, "/settings") ? "text-accent" : "text-muted"}`}
+          >
+            ⚙︎
+          </Link>
+        </div>
+        <nav aria-label="Main" className="ml-auto hidden sm:block">
           <ul className="flex gap-1 text-sm">
             {NAV.map((n) => (
               <li key={n.href}>
@@ -58,13 +63,29 @@ export function AppShell({ children }: { children: ReactNode }) {
         </nav>
       </header>
 
-      <div className="px-4 sm:px-6">
-        <p className="rounded-md border border-line bg-warn-soft px-3 py-2 text-xs text-warn" role="note">
-          <strong>Sample events.</strong> All events are fictional samples, and {calendarLabel(state.calendarMode, snapshot)}. Nothing here is real or bookable yet.
-          {mode === "local" && " This preview keeps your changes in this browser only."}
-          {mode === "local" && !storageAvailable && " Your browser storage is unavailable, so changes won't be kept after you leave."}
-        </p>
-      </div>
+      {(showingSamples || mode === "local") && (
+        <div className="px-4 sm:px-6">
+          <p className="rounded-md border border-line bg-warn-soft px-3 py-2 text-xs text-warn" role="note">
+            {showingSamples && (
+              <>
+                <strong>Sample events.</strong> These events are fictional samples until real sources load, and {calendarLabel(state.calendarMode, snapshot)}.{" "}
+              </>
+            )}
+            {mode === "local" && "This preview keeps your changes in this browser only."}
+            {mode === "local" && !storageAvailable && " Your browser storage is unavailable, so changes won't be kept after you leave."}
+          </p>
+        </div>
+      )}
+      {calendarIssue === "reconnect" && (
+        <div className="px-4 pt-2 sm:px-6" role="alert">
+          <p className="rounded-md bg-warn-soft px-3 py-2 text-xs text-warn">
+            Your Google Calendar connection has expired, so suggested times aren&rsquo;t checked against it.{" "}
+            <a href="/api/calendar/google/start" className="font-medium underline">
+              Reconnect
+            </a>
+          </p>
+        </div>
+      )}
 
       {syncError && (
         <div className="px-4 pt-2 sm:px-6" role="alert">

@@ -27,9 +27,10 @@ export interface AppState {
   onboarded: boolean;
   /**
    * "demo" uses the sample calendar; "snapshot" uses a read-only copy of the user's real
-   * busy times when one is bundled; "disconnected" means no calendar. Live Google is Phase 3.
+   * busy times when one is bundled; "google" reads live free/busy from a connected Google
+   * Calendar (set only by the server once connected); "disconnected" means no calendar.
    */
-  calendarMode: "demo" | "snapshot" | "disconnected";
+  calendarMode: "demo" | "snapshot" | "disconnected" | "google";
   prefs: Preferences;
   saved: Record<string, SavedEvent>;
   trips: Record<string, SavedTrip>;

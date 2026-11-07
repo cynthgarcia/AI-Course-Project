@@ -107,4 +107,42 @@ export const MIGRATIONS: { id: string; statements: string[] }[] = [
       `create index sessions_expires_idx on sessions (expires_at)`,
     ],
   },
+  {
+    id: "0004_calendar_alerts",
+    statements: [
+      `alter table profiles drop constraint if exists profiles_calendar_mode_check`,
+      `alter table profiles add constraint profiles_calendar_mode_check check (calendar_mode in ('demo', 'snapshot', 'disconnected', 'google'))`,
+      // Google Calendar (free/busy only). The refresh token is encrypted at rest and never sent to browsers.
+      `create table calendar_connections (
+        user_id uuid primary key references users (id) on delete cascade,
+        provider text not null default 'google',
+        refresh_token_enc text not null,
+        scope text not null,
+        connected_at timestamptz not null default now(),
+        busy jsonb not null default '[]'::jsonb,
+        busy_fetched_at timestamptz,
+        last_error text
+      )`,
+      `create table notifications (
+        user_id uuid not null references users (id) on delete cascade,
+        event_id text not null,
+        title text not null,
+        reason text not null,
+        starts_at timestamptz not null,
+        created_at timestamptz not null default now(),
+        read_at timestamptz,
+        pushed_at timestamptz,
+        primary key (user_id, event_id)
+      )`,
+      `create index notifications_user_created_idx on notifications (user_id, created_at desc)`,
+      `create table push_subscriptions (
+        endpoint text primary key,
+        user_id uuid not null references users (id) on delete cascade,
+        p256dh text not null,
+        auth text not null,
+        created_at timestamptz not null default now()
+      )`,
+      `create index push_subscriptions_user_idx on push_subscriptions (user_id)`,
+    ],
+  },
 ];

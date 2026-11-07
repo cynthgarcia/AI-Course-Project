@@ -1,6 +1,10 @@
-# Your Life Curator
+# Off Hours
 
-A personal concierge for experiences, culture, friends and travel — it finds things worth doing,
+*A life beyond the calendar.* Less planning. More living.
+
+> Your week is busy. Your life shouldn't have to wait.
+
+Off Hours (project folder `life-curator`) is a personal concierge for experiences, culture, friends and travel — it finds things worth doing,
 checks whether they realistically fit your time and budget, and helps you plan (never books or sends anything).
 
 > **Status:** a full-stack app with accounts and a Postgres database. Events are still fictional
@@ -36,8 +40,11 @@ See **[DEPLOY.md](DEPLOY.md)** — Vercel + Supabase, about 15 minutes. Check `/
 | `GET /api/state` | The signed-in user's data |
 | `POST /api/actions` | Apply one validated change |
 | `GET /api/events` | Event catalogue and source status (cached per source in the database) |
+| `GET /api/sources` | Every source with last update, event count and problems |
+| `/api/calendar/google/start`, `/callback`, `/disconnect`, `GET /api/calendar/status`, `/busy` | Google Calendar free/busy connection (state + PKCE, encrypted refresh token) |
+| `/api/push/*`, `GET /api/notifications`, `POST /api/notifications/read` | Device notifications and the alert list |
 | `GET /api/health` | Setup check: database, schema, scheduled jobs, sources (no secrets) |
-| `GET /api/cron/*` | Daily jobs (event refresh, weekly plans); require `CRON_SECRET` |
+| `GET /api/cron/*` | Daily jobs (event refresh; weekly plans + alerts); require `CRON_SECRET` |
 | `POST /api/import` | Read one pasted event page into a draft (https only, public IPs only, size and time limits) |
 | `GET /api/export`, `DELETE /api/account` | Data export and account deletion |
 
@@ -63,6 +70,13 @@ logging, cascading account deletion. Changes made together are saved as one atom
   public speaking, voice), with upcoming events that let you try each one.
 - **Add your own events** — paste a link (reads the event details many sites publish for search
   engines) or add by hand, including invitation-only galas with a "how to get in" note. Private to you.
+- **Calendar** — "Connect Google Calendar" (read-only free/busy: never titles or details, can't change
+  anything), and "Add to calendar" on every real event — a pre-filled Google/Outlook page or an .ics file
+  the user saves themselves. Planning an event prompts "Add it to your calendar?".
+- **Alerts** — follow artists, venues, organisers or any word; get an in-app alert and an optional phone
+  notification (web push) when something matching appears, plus at most two very strong matches a day that
+  fit the calendar. Checked once a day, in the afternoon.
+- **Where events come from** — Settings lists every source with its last update, event count and problems.
 - **My Life** — every status plus the travel shortlist, with search and filters.
 - **Wrapped** — your history by year (including things from before you used the app), each rated
   out of 5: totals, a persona, month-by-month chart, top-rated, categories, company, places, spend.
@@ -75,7 +89,7 @@ logging, cascading account deletion. Changes made together are saved as one atom
 | Area | State |
 |---|---|
 | Events | Ticketmaster and Eventbrite adapters built and tested against sample responses; they switch on with API keys. Until then, fictional sample feeds |
-| Calendar | Sample busy times or "no calendar"; Google Calendar not connected |
+| Calendar | Google Calendar free/busy once Google sign-in is set up (DEPLOY.md §4); otherwise sample or none |
 | Persistence | Real database and accounts; no hosted deployment yet |
 | Travel prices | Not fetched; journey times are typical reference durations |
 | Digest | Manual only; no scheduler; nothing is ever emailed |

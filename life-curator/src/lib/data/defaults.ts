@@ -57,6 +57,9 @@ export const DEFAULT_PREFERENCES: Preferences = {
   digestTime: "15:00",
   protectedBlocks: DEFAULT_PROTECTED_BLOCKS,
   goals: [],
+  follows: [],
+  alertsEnabled: true,
+  alertStrongMatches: true,
   weeklyFunIntention: true,
   monthlyNewIntention: true,
 };

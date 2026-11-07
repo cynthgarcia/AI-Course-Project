@@ -62,7 +62,7 @@ export async function fetchText(raw: string, opts: FetchTextOptions = {}): Promi
     const res = await fetchImpl(url, {
       redirect: "manual",
       signal: AbortSignal.timeout(8_000),
-      headers: { accept: acceptHeader, "user-agent": "YourLifeCurator/1.0 (+event discovery; respects robots.txt)" },
+      headers: { accept: acceptHeader, "user-agent": "OffHours/1.0 (+event discovery; respects robots.txt)" },
     }).catch(() => {
       throw new ImportError("That page couldn't be reached.");
     });

@@ -41,7 +41,7 @@ test.afterEach(async ({ page }) => {
 
 test("onboarding leads to a labelled demo shortlist of at most six", async ({ page }) => {
   await onboard(page);
-  await expect(page.getByText(/All events are fictional samples/)).toBeVisible();
+  await expect(page.getByText(/These events are fictional samples/)).toBeVisible();
   await expect(page.getByText(/keeps your changes in this browser only/)).toHaveCount(0);
   const shortlist = page.locator("section[aria-labelledby=shortlist] article");
   const n = await shortlist.count();
@@ -248,4 +248,19 @@ test("new accounts start neutral and the welcome flow sets the profile", async (
   await page.goto("/settings");
   await expect(page.locator("label", { hasText: /^Tue$/ }).first()).toHaveClass(/bg-ink/);
   await expect(page.getByText("Friday — keep free for friends").or(page.locator('input[value="Friday — keep free for friends"]'))).toHaveCount(1);
+});
+
+test("alerts: follow from an event and see it in Settings and Alerts", async ({ page }) => {
+  await onboard(page);
+  await page.goto("/settings");
+  await page.getByLabel("Follow an artist, venue or word").fill("Kurt Elling");
+  await page.getByRole("button", { name: "Follow", exact: true }).click();
+  await expect(page.getByRole("button", { name: "Stop following Kurt Elling" })).toBeVisible();
+  await page.goto("/alerts");
+  await expect(page.getByRole("heading", { name: "Don’t miss the good ones" })).toBeVisible();
+  await expect(page.getByText("Kurt Elling")).toBeVisible();
+  await expect(page.getByText(/Phone notifications aren’t set up on the server yet|can’t show notifications|Turn on notifications/)).toBeVisible();
+  await page.goto("/settings");
+  await expect(page.getByRole("heading", { name: "Where events come from" })).toBeVisible();
+  await expect(page.getByText("Ticketing")).toBeVisible();
 });

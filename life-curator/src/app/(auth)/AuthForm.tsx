@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { btn } from "@/components/ui";
+import { BRAND } from "@/lib/brand";
 
 export function AuthForm({ mode }: { mode: "login" | "signup" }) {
   const [email, setEmail] = useState("");
@@ -46,10 +47,12 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
   return (
     <main className="mx-auto flex min-h-dvh max-w-sm flex-col justify-center gap-6 px-4 py-10">
       <div>
-        <p className="font-serif text-2xl">
-          Your Life <span className="italic text-accent">Curator</span>
+        <p className="font-serif text-3xl">
+          Off <span className="italic text-accent">Hours</span>
         </p>
-        <h1 className="mt-6 font-serif text-3xl">{signup ? "Create your account" : "Welcome back"}</h1>
+        <p className="mt-1 font-serif text-lg italic text-muted">{BRAND.slogan}</p>
+        <p className="mt-6 text-lg leading-snug">{BRAND.message}</p>
+        <h1 className="mt-6 font-serif text-2xl">{signup ? "Create your account" : "Welcome back"}</h1>
         <p className="mt-1 text-sm text-muted">{signup ? "Your plans, history and preferences are private to you." : "Sign in to see what's worth doing soon."}</p>
       </div>
       <form onSubmit={submit} className="space-y-3" noValidate>

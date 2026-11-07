@@ -1,4 +1,4 @@
-// Core domain types for Your Life Curator.
+// Core domain types for Off Hours.
 // Unknown values are represented explicitly (null / "unknown"), never guessed.
 
 export type Weekday = "mon" | "tue" | "wed" | "thu" | "fri" | "sat" | "sun";
@@ -202,6 +202,11 @@ export interface Preferences {
   protectedBlocks: TimeBlock[];
   /** What the user wants more of in life — goal keys (see hobbies.ts) or their own words. */
   goals: string[];
+  /** Artists, venues, organisers or words to get alerts for. */
+  follows: string[];
+  alertsEnabled: boolean;
+  /** Also alert for very strong matches that fit the calendar, not only follows. */
+  alertStrongMatches: boolean;
   weeklyFunIntention: boolean;
   monthlyNewIntention: boolean;
 }

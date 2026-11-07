@@ -10,6 +10,7 @@ import { initialTripCosts } from "@/lib/domain/trip";
 import { TRAVEL_STATUS_LABELS, type TravelStatus, type TripCosts } from "@/lib/domain/types";
 import { useStore } from "@/lib/store/AppStore";
 import { experienceFromEvent } from "@/lib/ui/experience";
+import { AddToCalendar } from "./AddToCalendar";
 import { CostInput } from "./CostInput";
 import { Badge, btn } from "./ui";
 
@@ -188,6 +189,7 @@ export function TripPanel({ rec }: { rec: Recommendation }) {
             )}
           </div>
         )}
+        {saved?.status === "planned" && Date.parse(event.start) > derived.now && <AddToCalendar event={event} prompt />}
         {saved && (
           <label className="block text-sm">
             <span className="text-muted">Research notes</span>

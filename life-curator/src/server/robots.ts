@@ -1,6 +1,6 @@
 // robots.txt check for configured venue pages. Conservative: if robots.txt can't be
 // read (other than "not found"), the page is not fetched.
-const AGENT = "yourlifecurator";
+const AGENT = "offhours";
 
 export function robotsAllows(robots: string, path: string): boolean {
   const groups: { agents: string[]; rules: { allow: boolean; path: string }[] }[] = [];

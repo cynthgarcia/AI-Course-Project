@@ -1,6 +1,9 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { Suspense, useState, type ReactNode } from "react";
+import { AlertsSettings } from "@/components/settings/AlertsSettings";
+import { CalendarSettings } from "@/components/settings/CalendarSettings";
+import { SourcesList } from "@/components/settings/SourcesList";
 import { Notice, btn } from "@/components/ui";
 import { AREA_LABELS } from "@/lib/domain/areas";
 import { formatShortDay, formatTime } from "@/lib/domain/time";
@@ -12,7 +15,7 @@ const DAY_LABEL: Record<Weekday, string> = { mon: "Mon", tue: "Tue", wed: "Wed",
 const TIMEZONES = ["Europe/London", "Europe/Dublin", "Europe/Lisbon", "Europe/Paris", "Europe/Berlin", "Europe/Madrid", "Europe/Rome", "America/New_York"];
 
 export default function SettingsPage() {
-  const { state, dispatch, snapshot, mode, email, sources } = useStore();
+  const { state, dispatch, mode, email } = useStore();
   const [accountBusy, setAccountBusy] = useState(false);
   const [accountError, setAccountError] = useState<string | null>(null);
   const signOut = async () => {
@@ -40,7 +43,7 @@ export default function SettingsPage() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `life-curator-export-${new Date().toISOString().slice(0, 10)}.json`;
+    a.download = `off-hours-export-${new Date().toISOString().slice(0, 10)}.json`;
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -93,44 +96,18 @@ export default function SettingsPage() {
       </Section>
 
       <Section title="Calendar">
-        <div className="space-y-2">
-          {(snapshot ? (["snapshot", "demo", "disconnected"] as const) : (["demo", "disconnected"] as const)).map((m) => (
-            <label key={m} className="flex cursor-pointer gap-3 rounded-lg border border-line bg-card p-3 text-sm">
-              <input type="radio" name="calmode" checked={state.calendarMode === m} onChange={() => dispatch({ type: "setCalendarMode", mode: m })} className="accent-[var(--accent)]" />
-              {m === "snapshot"
-                ? `My Google Calendar busy times (read-only copy from ${snapshot?.fetchedAt ? new Date(snapshot.fetchedAt).toLocaleDateString("en-GB", { day: "numeric", month: "short" }) : "?"}, not live)`
-                : m === "demo"
-                  ? "Sample calendar (made-up busy times)"
-                  : "No calendar — suggested times are unverified"}
-            </label>
-          ))}
-          <div className="rounded-lg border border-dashed border-line p-3 text-sm text-muted">
-            <p className="font-medium text-ink">Google Calendar · not connected</p>
-            <p>
-              Read-only free/busy access is planned but not built yet: it needs Google OAuth credentials configured on the server. When it&rsquo;s added, only busy
-              times will be read — never event titles or descriptions — and nothing will ever be written to your calendar.
-            </p>
-          </div>
-        </div>
+        <Suspense fallback={null}>
+          <CalendarSettings />
+        </Suspense>
+      </Section>
+
+      <Section title="Alerts">
+        <AlertsSettings />
       </Section>
 
       {mode === "server" && (
-        <Section title="Event sources">
-          <p className="text-sm text-muted">Where events come from. Keys are set on the server by whoever runs the app, never in the browser.</p>
-          <ul className="divide-y divide-line rounded-lg border border-line bg-card text-sm">
-            {sources.map((s) => (
-              <li key={s.id} className="flex flex-wrap items-baseline justify-between gap-2 px-3 py-2">
-                <span className="font-medium">{s.name}</span>
-                <span className={s.configured ? "text-ok" : "text-muted"}>
-                  {s.configured ? "On" : "Not set up"} · {s.note}
-                </span>
-              </li>
-            ))}
-            <li className="flex flex-wrap items-baseline justify-between gap-2 px-3 py-2">
-              <span className="font-medium">DICE, Instagram and anything else</span>
-              <span className="text-muted">Add from a link or by hand in Discover — these don&rsquo;t offer apps a way to search their events</span>
-            </li>
-          </ul>
+        <Section title="Where events come from">
+          <SourcesList />
         </Section>
       )}
 

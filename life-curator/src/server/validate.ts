@@ -69,6 +69,9 @@ export const preferencesPatch = z
     digestTime: time,
     protectedBlocks: z.array(timeBlock).max(60),
     goals: z.array(z.string().trim().min(1).max(80)).max(12),
+    follows: z.array(z.string().trim().min(2).max(80)).max(50),
+    alertsEnabled: z.boolean(),
+    alertStrongMatches: z.boolean(),
     weeklyFunIntention: z.boolean(),
     monthlyNewIntention: z.boolean(),
   })
@@ -178,7 +181,7 @@ const userHobby = z.object({
 export const clientAction = z.discriminatedUnion("type", [
   z.object({ type: z.literal("completeOnboarding") }),
   z.object({ type: z.literal("setPrefs"), prefs: preferencesPatch }),
-  z.object({ type: z.literal("setCalendarMode"), mode: z.enum(["demo", "disconnected"]) }),
+  z.object({ type: z.literal("setCalendarMode"), mode: z.enum(["demo", "disconnected", "google"]) }),
   z.object({
     type: z.literal("setStatus"),
     eventId: id,

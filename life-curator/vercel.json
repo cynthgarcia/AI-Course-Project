@@ -3,6 +3,6 @@
   "regions": ["lhr1"],
   "crons": [
     { "path": "/api/cron/refresh-events", "schedule": "17 5 * * *" },
-    { "path": "/api/cron/weekly-plans", "schedule": "7 14 * * *" }
+    { "path": "/api/cron/daily", "schedule": "7 14 * * *" }
   ]
 }

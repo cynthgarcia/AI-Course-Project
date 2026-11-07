@@ -1,10 +1,12 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
+import { BRAND } from "@/lib/brand";
 
 export const metadata: Metadata = {
-  title: "Your Life Curator",
-  description: "A personal concierge for experiences, culture, friends and travel.",
+  title: BRAND.name,
+  description: `${BRAND.slogan} ${BRAND.message}`,
   robots: { index: false, follow: false },
+  appleWebApp: { capable: true, title: BRAND.name, statusBarStyle: "default" },
 };
 
 export const viewport: Viewport = {

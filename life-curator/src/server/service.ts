@@ -5,20 +5,21 @@ import { summarizeMonth } from "@/lib/domain/budget";
 import type { RankContext } from "@/lib/domain/ranking";
 import { canConfirmAttendance } from "@/lib/domain/status";
 import { addDays, localDate, startOfWeek, weekdayOfDate } from "@/lib/domain/time";
-import type { CuratorEvent, Preferences } from "@/lib/domain/types";
+import type { CalendarSnapshot, CuratorEvent, Preferences } from "@/lib/domain/types";
 import { hobbyTasteEntries } from "@/lib/domain/hobbies";
 import { generateWeeklyPlan } from "@/lib/domain/weeklyPlan";
 import { demoCalendar, DISCONNECTED_CALENDAR } from "@/lib/data/demoCalendar";
 import { reducer, type Action, type AppState } from "@/lib/store/state";
 import { getDb } from "./db";
 import { catalogue } from "./events";
+import { connectionStatus, liveCalendar } from "./googleCalendar";
 import { loadState, persistDiff } from "./repo";
 import { normalizeCustomEvent, type ClientAction } from "./validate";
 
 export class ActionError extends Error {}
 
 /** Shared catalogue events must be loaded before any transaction starts (one-connection databases). */
-export function rankContextFor(state: AppState, now: number, shared: CuratorEvent[]): { ctx: RankContext; events: CuratorEvent[] } {
+export function rankContextFor(state: AppState, now: number, shared: CuratorEvent[], live: CalendarSnapshot | null = null): { ctx: RankContext; events: CuratorEvent[] } {
   const events = [...shared, ...Object.values(state.customEvents)].sort((a, b) => Date.parse(a.start) - Date.parse(b.start));
   const { prefs } = state;
   const today = localDate(now, prefs.timezone);
@@ -29,7 +30,7 @@ export function rankContextFor(state: AppState, now: number, shared: CuratorEven
     ctx: {
       now,
       prefs,
-      calendar: state.calendarMode === "demo" ? demoCalendar(now) : DISCONNECTED_CALENDAR,
+      calendar: state.calendarMode === "demo" ? demoCalendar(now) : state.calendarMode === "google" && live ? live : DISCONNECTED_CALENDAR,
       protectedIntervals: expandBlocks(prefs.protectedBlocks, addDays(today, -1), 130, prefs.timezone),
       saved: new Map(Object.entries(state.saved)),
       trips: new Map(Object.entries(state.trips)),
@@ -52,21 +53,24 @@ export async function applyActions(userId: string, actions: ClientAction[], now 
     (action) => action.type === "generatePlan" || ((action.type === "setStatus" || action.type === "setTripStatus") && action.status === "attended"),
   );
   const shared = needsEvents ? (await catalogue(now)).events : [];
+  const live = needsEvents ? await liveCalendar(db, userId, now).catch(() => null) : null;
+  if (actions.some((a) => a.type === "setCalendarMode" && a.mode === "google") && !(await connectionStatus(db, userId)).connected)
+    throw new ActionError("Connect Google Calendar first.");
   return db.transaction(async (q) => {
     const initial = await loadState(q, userId, true);
     let before = initial;
-    for (const action of actions) before = step(before, action, now, shared);
+    for (const action of actions) before = step(before, action, now, shared, live);
     await persistDiff(q, userId, initial, before);
     return before;
   });
 }
 
-function step(before: AppState, action: ClientAction, now: number, shared: CuratorEvent[]): AppState {
+function step(before: AppState, action: ClientAction, now: number, shared: CuratorEvent[], live: CalendarSnapshot | null): AppState {
   let after: AppState;
 
   if (action.type === "generatePlan") {
     const at = new Date(now).toISOString();
-    const { ctx, events } = rankContextFor(before, now, shared);
+    const { ctx, events } = rankContextFor(before, now, shared, live);
     try {
       const plan = generateWeeklyPlan(events, ctx);
       after = reducer(before, { type: "addPlan", plan, run: { at, weekStart: plan.weekStart, trigger: "manual", outcome: "generated", itemCount: plan.items.length, error: null } });
@@ -109,6 +113,7 @@ export async function runScheduledPlans(now = Date.now(), budgetMs = 45_000): Pr
       result.skipped++;
       continue;
     }
+    const live = await liveCalendar(db, u.user_id, now).catch(() => null);
     await db
       .transaction(async (q) => {
         const before = await loadState(q, u.user_id, true);
@@ -120,7 +125,7 @@ export async function runScheduledPlans(now = Date.now(), budgetMs = 45_000): Pr
         const at = new Date(now).toISOString();
         let after: AppState;
         try {
-          const { ctx, events } = rankContextFor(before, now, shared);
+          const { ctx, events } = rankContextFor(before, now, shared, live);
           const plan = generateWeeklyPlan(events, ctx);
           after = reducer(before, { type: "addPlan", plan, run: { at, weekStart, trigger: "scheduled", outcome: "generated", itemCount: plan.items.length, error: null } });
           result.generated++;

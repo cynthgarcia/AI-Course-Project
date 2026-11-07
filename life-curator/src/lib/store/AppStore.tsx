@@ -74,6 +74,8 @@ interface Store {
   snapshot: CalendarSnapshot | null;
   /** Which event sources the server has configured (server mode only). */
   sources: SourceStatus[];
+  /** Set when a connected Google Calendar needs reconnecting. */
+  calendarIssue: "reconnect" | null;
   derived: Derived | null;
 }
 
@@ -105,6 +107,8 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
   const [catalogueEvents, setEvents] = useState<CuratorEvent[] | null>(null);
   const [sourceRuns, setSourceRuns] = useState<SourceRunResult[]>([]);
   const [sources, setSources] = useState<SourceStatus[]>([]);
+  const [googleCal, setGoogleCal] = useState<CalendarSnapshot | null>(null);
+  const [calendarIssue, setCalendarIssue] = useState<"reconnect" | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [snapshot] = useState<CalendarSnapshot | null>(() => readEmbeddedSnapshot());
 
@@ -202,6 +206,19 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
     }
   }, [state, hydrated, mode]);
 
+  // Live busy times from a connected Google Calendar (server mode), refreshed every 15 minutes.
+  const calTick = now === null ? null : Math.floor(now / 900_000);
+  useEffect(() => {
+    if (mode !== "server" || state.calendarMode !== "google" || calTick === null) return;
+    fetch("/api/calendar/busy", { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((b: { calendar: CalendarSnapshot | null; reconnect?: boolean } | null) => {
+        setGoogleCal(b?.calendar ?? null);
+        setCalendarIssue(b?.reconnect ? "reconnect" : null);
+      })
+      .catch(() => undefined);
+  }, [mode, state.calendarMode, calTick]);
+
   // Load events once a clock is available (refresh hourly is plenty).
   const loadHour = now === null ? null : Math.floor(now / 3_600_000);
   useEffect(() => {
@@ -235,7 +252,9 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
         ? demoCalendar(now)
         : state.calendarMode === "snapshot" && snapshot
           ? snapshot
-          : DISCONNECTED_CALENDAR;
+          : state.calendarMode === "google" && googleCal
+            ? googleCal
+            : DISCONNECTED_CALENDAR;
     const today = localDate(now, prefs.timezone);
     const protectedIntervals = expandBlocks(prefs.protectedBlocks, addDays(today, -1), 130, prefs.timezone);
     const eventMap = new Map(events.map((e) => [e.id, e]));
@@ -268,7 +287,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
       browse: rankAll(events, { ...rankContext, mode: "browse" }),
       rankContext,
     };
-  }, [now, catalogueEvents, sourceRuns, state, snapshot]);
+  }, [now, catalogueEvents, sourceRuns, state, snapshot, googleCal]);
 
   const generatePlan = useCallback(async () => {
     if (mode === "server") {
@@ -296,8 +315,8 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
   }, [mode, derived, state.prefs.timezone, flush]);
 
   const value = useMemo<Store>(
-    () => ({ mode, state, dispatch, generatePlan, email, syncError, ready: hydrated && derived !== null, loadError, storageAvailable, snapshot, sources, derived }),
-    [mode, state, dispatch, generatePlan, email, syncError, hydrated, derived, loadError, storageAvailable, snapshot, sources],
+    () => ({ mode, state, dispatch, generatePlan, email, syncError, ready: hydrated && derived !== null, loadError, storageAvailable, snapshot, sources, calendarIssue, derived }),
+    [mode, state, dispatch, generatePlan, email, syncError, hydrated, derived, loadError, storageAvailable, snapshot, sources, calendarIssue],
   );
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }
@@ -314,7 +333,7 @@ export function useStamp(): () => string {
 }
 
 export function exportState(state: AppState): string {
-  return JSON.stringify({ exportedAt: new Date().toISOString(), app: "your-life-curator", data: state }, null, 2);
+  return JSON.stringify({ exportedAt: new Date().toISOString(), app: "off-hours", data: state }, null, 2);
 }
 
 export function clearStoredState(): void {

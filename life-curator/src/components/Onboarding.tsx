@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { BRAND } from "@/lib/brand";
 import { AREA_LABELS } from "@/lib/domain/areas";
 import { GOAL_LABELS, type GoalKey } from "@/lib/domain/hobbies";
 import { CATEGORY_LABELS, WEEKDAYS, type AreaId, type Category, type Preferences, type TimeBlock, type Weekday } from "@/lib/domain/types";
@@ -29,14 +30,27 @@ function presetMatches(blocks: TimeBlock[], p: Preset): boolean {
 }
 
 export function Onboarding() {
-  const { state, dispatch, snapshot } = useStore();
+  const { state, dispatch, snapshot, mode } = useStore();
   const initial = state.prefs;
   const [step, setStep] = useState(0);
   const [p, setP] = useState<Preferences>(initial);
   const [commutes, setCommutes] = useState(initial.officeDays.length > 0);
   const [presets, setPresets] = useState<Set<string>>(() => new Set(PRESETS.filter((x) => presetMatches(initial.protectedBlocks, x)).map((x) => x.id)));
   const [keywords, setKeywords] = useState(initial.interestKeywords.join(", "));
-  const [calendar, setCalendar] = useState<"demo" | "snapshot" | "disconnected">(snapshot ? "snapshot" : state.calendarMode);
+  const [googleAvailable, setGoogleAvailable] = useState(false);
+  const [calendar, setCalendar] = useState<"google" | "demo" | "snapshot" | "disconnected">(snapshot ? "snapshot" : state.calendarMode);
+  useEffect(() => {
+    if (mode !== "server") return;
+    fetch("/api/calendar/status")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((s: { available?: boolean } | null) => {
+        if (s?.available) {
+          setGoogleAvailable(true);
+          setCalendar("google");
+        }
+      })
+      .catch(() => undefined);
+  }, [mode]);
   const set = (patch: Partial<Preferences>) => setP((x) => ({ ...x, ...patch }));
 
   const finish = () => {
@@ -60,8 +74,10 @@ export function Onboarding() {
         protectedBlocks: [...custom, ...chosen],
       },
     });
-    dispatch({ type: "setCalendarMode", mode: calendar });
+    if (calendar !== "google") dispatch({ type: "setCalendarMode", mode: calendar });
     dispatch({ type: "completeOnboarding" });
+    // Google's consent screen comes last; saves above are already on their way.
+    if (calendar === "google") window.setTimeout(() => window.location.assign("/api/calendar/google/start"), 150);
   };
 
   return (
@@ -71,7 +87,7 @@ export function Onboarding() {
           Welcome · step {step + 1} of {STEPS.length}
         </p>
         <h1 id="welcome" className="mt-1 font-serif text-3xl leading-tight sm:text-4xl">
-          {["A fuller life, not a busier one.", "What do you enjoy?", "Money and what you're after", "Protect your time"][step]}
+          {[BRAND.tagline, "What do you enjoy?", "Money and what you're after", "Protect your time"][step]}
         </h1>
         <ol className="mt-3 flex gap-1" aria-hidden>
           {STEPS.map((s, i) => (
@@ -242,6 +258,15 @@ export function Onboarding() {
           </fieldset>
           <fieldset className="space-y-2">
             <legend className="text-sm">Calendar</legend>
+            {googleAvailable && (
+              <label className="flex cursor-pointer gap-3 rounded-lg border border-line bg-card p-3 text-sm">
+                <input type="radio" name="cal" checked={calendar === "google"} onChange={() => setCalendar("google")} className="mt-0.5 accent-[var(--accent)]" />
+                <span>
+                  <span className="font-medium">Connect Google Calendar (recommended)</span>
+                  <span className="block text-muted">Google asks you to approve. Off Hours only sees when you&rsquo;re busy — never what the events are — and can&rsquo;t change your calendar.</span>
+                </span>
+              </label>
+            )}
             {snapshot && (
               <label className="flex cursor-pointer gap-3 rounded-lg border border-line bg-card p-3 text-sm">
                 <input type="radio" name="cal" checked={calendar === "snapshot"} onChange={() => setCalendar("snapshot")} className="mt-0.5 accent-[var(--accent)]" />
@@ -265,7 +290,7 @@ export function Onboarding() {
                 <span className="block text-muted">Suggested times will be marked unverified.</span>
               </span>
             </label>
-            <p className="text-xs text-muted">Connecting Google Calendar directly is coming next.</p>
+            {!googleAvailable && mode === "server" && <p className="text-xs text-muted">Connecting Google Calendar isn&rsquo;t switched on for this app yet — you can connect it later in Settings.</p>}
           </fieldset>
         </div>
       )}
@@ -278,7 +303,11 @@ export function Onboarding() {
         ) : (
           <span />
         )}
-        {step < STEPS.length - 1 ? (
+        {step === STEPS.length - 1 && calendar === "google" ? (
+          <button type="button" onClick={finish} className="rounded-full bg-ink px-5 py-3 font-medium text-paper">
+            Connect Google &amp; finish
+          </button>
+        ) : step < STEPS.length - 1 ? (
           <button type="button" className={btn.primary} onClick={() => setStep((s) => s + 1)}>
             Next
           </button>

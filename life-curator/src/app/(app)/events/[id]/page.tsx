@@ -3,7 +3,9 @@
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useState } from "react";
+import { AddToCalendar } from "@/components/AddToCalendar";
 import { CostInput } from "@/components/CostInput";
+import { FollowChips } from "@/components/FollowChips";
 import { DismissControl, PlanControl } from "@/components/EventActions";
 import { InvitationDraft } from "@/components/InvitationDraft";
 import { StarRating } from "@/components/StarRating";
@@ -127,6 +129,11 @@ export default function EventDetailPage() {
           </dd>
         </dl>
         {official && <p className="mt-2 text-xs text-muted">Ticket availability isn&rsquo;t checked here — the official page is the source of truth.</p>}
+        {!event.isDemo && Date.parse(event.start) > derived.now && state.saved[event.id]?.status !== "planned" && (
+          <div className="mt-3">
+            <AddToCalendar event={event} />
+          </div>
+        )}
       </section>
 
       <section aria-labelledby="about" className="space-y-3">
@@ -189,6 +196,8 @@ export default function EventDetailPage() {
 
       <InvitationDraft event={event} />
 
+      {!event.isDemo && <FollowChips event={event} />}
+
       {event.addedByUser && <RemoveCustomEvent id={event.id} />}
     </article>
   );
@@ -232,6 +241,7 @@ function LocalPlanning({ event }: { event: CuratorEvent }) {
           </button>
         )}
       </div>
+      {status === "planned" && !started && <AddToCalendar event={event} prompt />}
       {allowed.includes("attended") && !started && <p className="text-xs text-muted">You can mark it attended once it has started.</p>}
       {confirmAttend && (
         <div role="alertdialog" aria-label="Confirm attendance" className="flex flex-wrap items-center gap-2 rounded-lg bg-ok-soft p-3 text-sm text-ok">

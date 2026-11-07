@@ -1,4 +1,4 @@
-# Life Curator — notes for Claude
+# Off Hours (life-curator) — notes for Claude
 
 - Product brief: `PRODUCT_SPEC.md` (condensed; the original master spec is canonical). Defaults: `USER_PROFILE.md`.
 - Stack: Next.js 15 App Router, React 19, TypeScript (strict), Tailwind v4, Vitest, Playwright.
@@ -9,7 +9,10 @@
   query by the session user's id. Add schema changes as a new entry in `src/server/migrations.ts`.
 - Event providers implement `EventSourceAdapter` (`src/lib/sources/types.ts`) and go through `collectEvents`.
 - Sample data must stay labelled as fictional and must never carry booking links.
-- Never add calendar writes, purchases, bookings or automatic messaging (a guardrail test scans for them).
+- Never add calendar writes, purchases, bookings or messages to other people (a guardrail test scans for
+  them). Google Calendar access is free/busy only; "Add to calendar" is a pre-filled link or .ics file the
+  user saves. Alerts go only to the user, only on devices they opted in, and are capped per day.
+- Brand wording lives in `src/lib/brand.ts`.
 
 ## Checks
 ```bash
